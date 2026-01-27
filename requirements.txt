@@ -1,0 +1,9 @@
+pandas
+geopandas
+numpy
+scikit-learn
+tensorflow
+gTTS
+playsound
+matplotlib
+shapely

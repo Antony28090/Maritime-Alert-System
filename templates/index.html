@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maritime Alert System</title>
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Roboto', sans-serif;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100%;
+        }
+
+        #hud {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 300px;
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 1000;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .status-row {
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+
+        .label {
+            font-weight: bold;
+            color: #aaa;
+        }
+
+        .value {
+            font-weight: bold;
+        }
+
+        .zone-safe {
+            color: #4caf50;
+        }
+
+        .zone-caution {
+            color: #ffeb3b;
+        }
+
+        .zone-danger {
+            color: #f44336;
+        }
+
+        #alert-box {
+            margin-top: 15px;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            font-weight: bold;
+            display: none;
+        }
+
+        .alert-danger {
+            background: padding-box;
+            background-color: #f44336;
+            color: white;
+            animation: blink 1s infinite;
+        }
+
+        .alert-caution {
+            background-color: #ffeb3b;
+            color: black;
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.5;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="hud">
+        <h2 style="margin-top:0">Vessel Status</h2>
+        <div class="status-row">
+            <span class="label">Location:</span>
+            <span class="value" id="loc-val">--</span>
+        </div>
+        <div class="status-row">
+            <span class="label">Zone:</span>
+            <span class="value" id="zone-val">--</span>
+        </div>
+        <div class="status-row">
+            <span class="label">Forecast:</span>
+            <span class="value" id="forecast-val">--</span>
+        </div>
+
+        <div id="alert-box">NO ALERTS</div>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="/static/js/main.js"></script>
+</body>
+
+</html>
