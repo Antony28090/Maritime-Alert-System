@@ -57,31 +57,47 @@ class TrajectoryForecaster:
         
     def create_sequences(self, data, lookback):
         X, y = [], []
-        # data should be a numpy array of [lat, lon]
-        for i in range(len(data) - lookback):
-            X.append(data[i:(i + lookback)])
-            y.append(data[i + lookback]) # Predict next step
+        # Calculate deltas for the entire sequence first
+        deltas = np.diff(data, axis=0)
+        # deltas length is len(data) - 1
+        # we need 'lookback' deltas to predict the next delta
+        for i in range(len(deltas) - lookback):
+            X.append(deltas[i:(i + lookback)])
+            y.append(deltas[i + lookback]) 
         return np.array(X), np.array(y)
 
     def train(self, df):
-        # We need to train per trajectory, or just concat all valid sequences.
-        # Group by trip_id
         sequences_X = []
         sequences_y = []
         
-        # Fit scaler on all data first
+        # Fit scaler on DELTAS first
         coords = df[['lat', 'lon']].values
-        self.scaler.fit(coords)
-        coords_scaled = self.scaler.transform(coords)
-        df_scaled = pd.DataFrame(coords_scaled, columns=['lat', 'lon'])
-        df_scaled['trip_id'] = df['trip_id']
         
-        for trip_id, group in df_scaled.groupby('trip_id'):
+        # We need to compute all deltas across trips to fit the scaler properly
+        all_deltas = []
+        for trip_id, group in df.groupby('trip_id'):
             trip_data = group[['lat', 'lon']].values
-            if len(trip_data) > self.lookback:
-                X, y = self.create_sequences(trip_data, self.lookback)
-                sequences_X.extend(X)
-                sequences_y.extend(y)
+            if len(trip_data) > 1:
+                all_deltas.append(np.diff(trip_data, axis=0))
+        
+        if all_deltas:
+            all_deltas_concat = np.vstack(all_deltas)
+            self.scaler.fit(all_deltas_concat)
+        
+        for trip_id, group in df.groupby('trip_id'):
+            trip_data = group[['lat', 'lon']].values
+            if len(trip_data) > self.lookback + 1:
+                # Get deltas for this trip
+                trip_deltas = np.diff(trip_data, axis=0)
+                # Scale deltas
+                trip_deltas_scaled = self.scaler.transform(trip_deltas)
+                
+                # We can reuse create_sequences on the scaled deltas
+                # but change create_sequences to not take diff again
+                # Actually, let's just build X, y here:
+                for i in range(len(trip_deltas_scaled) - self.lookback):
+                    sequences_X.append(trip_deltas_scaled[i:(i + self.lookback)])
+                    sequences_y.append(trip_deltas_scaled[i + self.lookback])
                 
         X_train = np.array(sequences_X)
         y_train = np.array(sequences_y)
@@ -89,24 +105,40 @@ class TrajectoryForecaster:
         # Build LSTM
         self.model = Sequential()
         self.model.add(LSTM(50, activation='relu', input_shape=(self.lookback, 2)))
-        self.model.add(Dense(2)) # Lat, Lon
+        self.model.add(Dense(2)) # Lat delta, Lon delta
         self.model.compile(optimizer='adam', loss='mse')
         
-        print("Training LSTM...")
+        print("Training LSTM with Deltas...")
         self.model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=1)
         
     def predict_next(self, recent_path):
         """
-        recent_path: list of last 'lookback' (lat, lon) tuples/lists
+        recent_path: list of last 'lookback' + 1 (lat, lon) absolute positions
+        so we can compute 'lookback' deltas.
         """
-        if len(recent_path) != self.lookback:
-            raise ValueError(f"Need exactly {self.lookback} points")
+        if len(recent_path) < self.lookback + 1:
+            # Fallback if we don't have enough points: just repeat the last known delta
+            if len(recent_path) >= 2:
+                last_delta = np.array(recent_path[-1]) - np.array(recent_path[-2])
+                return (np.array(recent_path[-1]) + last_delta).tolist()
+            return recent_path[-1] # Can't do much
             
-        input_seq = np.array(recent_path)
-        input_scaled = self.scaler.transform(input_seq).reshape(1, self.lookback, 2)
-        pred_scaled = self.model.predict(input_scaled, verbose=0)
-        pred = self.scaler.inverse_transform(pred_scaled)
-        return pred[0] # [lat, lon]
+        recent_points = np.array(recent_path[-(self.lookback + 1):])
+        recent_deltas = np.diff(recent_points, axis=0)
+        
+        input_scaled = self.scaler.transform(recent_deltas).reshape(1, self.lookback, 2)
+        
+        # Predict next delta in scaled space
+        pred_delta_scaled = self.model.predict(input_scaled, verbose=0)[0]
+        
+        # Inverse transform delta
+        pred_delta = self.scaler.inverse_transform([pred_delta_scaled])[0]
+        
+        # Add delta to the absolute last point
+        last_point = recent_points[-1]
+        next_point = last_point + pred_delta
+        
+        return next_point # [lat, lon]
         
     def save(self, path='models/lstm_model.keras'):
         self.model.save(path)

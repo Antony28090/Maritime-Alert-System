@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Model Validation Dashboard - Maritime Alert System</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        :root {
+            --primary-color: #2196F3;
+            --secondary-color: #607D8B;
+            --danger-color: #F44336;
+            --success-color: #4CAF50;
+            --card-bg: #fff;
+            --bg-color: #f5f7fa;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-color);
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+        }
+
+        h1 {
+            margin: 0;
+            color: #333;
+        }
+
+        .btn {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 10px 20px;
+            text-decoration: none;
+            border-radius: 5px;
+            font-weight: bold;
+            transition: background 0.3s;
+        }
+
+        .btn:hover {
+            background-color: #1976D2;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: var(--primary-color);
+            margin: 10px 0;
+        }
+
+        .metric-label {
+            color: #777;
+            text-transform: uppercase;
+            font-size: 0.9em;
+            letter-spacing: 1px;
+        }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .chart-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            height: 400px;
+        }
+
+        @media (max-width: 768px) {
+            .charts-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            font-size: 1.2em;
+            color: #666;
+        }
+
+        .error {
+            color: var(--danger-color);
+            text-align: center;
+            padding: 20px;
+            background: #ffebee;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Model Validation Dashboard</h1>
+            <a href="/" class="btn">Back to Map</a>
+        </header>
+
+        <div id="loading" class="loading">Loading metrics and generating validation data...</div>
+        <div id="error" class="error" style="display: none;"></div>
+
+        <div id="dashboard-content" style="display: none;">
+            <div class="metrics-grid">
+                <div class="card">
+                    <div class="metric-label">Zone Accuracy</div>
+                    <div class="metric-value" id="zone-acc">--%</div>
+                </div>
+                <!-- New Zone Metrics -->
+                <div class="card">
+                    <div class="metric-label">Precision (Danger)</div>
+                    <div class="metric-value" id="zone-precision">--</div>
+                </div>
+                <div class="card">
+                    <div class="metric-label">Recall (Danger)</div>
+                    <div class="metric-value" id="zone-recall">--</div>
+                </div>
+                <div class="card">
+                    <div class="metric-label">ROC-AUC</div>
+                    <div class="metric-value" id="zone-roc">--</div>
+                </div>
+            </div>
+
+            <div class="metrics-grid">
+                <div class="card">
+                    <div class="metric-label">Trajectory Accuracy</div>
+                    <div class="metric-value" id="traj-acc">--%</div>
+                </div>
+                <div class="card">
+                    <div class="metric-label">LSTM RMSE</div>
+                    <div class="metric-value" id="lstm-rmse">--</div>
+                </div>
+                <div class="card">
+                    <div class="metric-label">LSTM ADE</div>
+                    <div class="metric-value" id="lstm-ade">--</div>
+                </div>
+                <div class="card">
+                    <div class="metric-label">LSTM FDE</div>
+                    <div class="metric-value" id="lstm-fde">--</div>
+                </div>
+            </div>
+
+            <div class="charts-grid">
+                <div class="chart-container">
+                    <h3>Zone Classification Confusion Matrix</h3>
+                    <canvas id="cm-chart"></canvas>
+                </div>
+                <div class="chart-container">
+                    <h3>Trajectory Forecasting (Sample Trip)</h3>
+                    <canvas id="traj-chart"></canvas>
+                </div>
+            </div>
+
+            <div class="card" style="text-align: left;">
+                <h3>Detailed Trajectory Data</h3>
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead>
+                            <tr style="background: #f1f1f1;">
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Step</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Actual Lat</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Actual Lon</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Pred Lat</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Pred Lon</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Error (m)</th>
+                                <th style="padding: 10px; border-bottom: 2px solid #ddd;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="data-table-body">
+                            <!-- Rows will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            fetch('/api/validation')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        showError(data.error);
+                        return;
+                    }
+                    renderDashboard(data);
+                })
+                .catch(err => {
+                    showError("Failed to fetch validation data: " + err);
+                });
+        });
+
+        function showError(msg) {
+            document.getElementById('loading').style.display = 'none';
+            const errDiv = document.getElementById('error');
+            errDiv.textContent = msg;
+            errDiv.style.display = 'block';
+        }
+
+        function renderDashboard(data) {
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('dashboard-content').style.display = 'block';
+
+            // Metrics
+            // Metrics
+            document.getElementById('zone-acc').textContent = (data.zone_accuracy * 100).toFixed(1) + '%';
+
+            // Extract Danger class metrics (assume Label 'DANGER' exists)
+            const dangerIdx = data.zone_classification_report.labels.indexOf('DANGER');
+            if (dangerIdx !== -1) {
+                document.getElementById('zone-precision').textContent = data.zone_classification_report.precision[dangerIdx].toFixed(3);
+                document.getElementById('zone-recall').textContent = data.zone_classification_report.recall[dangerIdx].toFixed(3);
+            } else {
+                document.getElementById('zone-precision').textContent = "N/A";
+                document.getElementById('zone-recall').textContent = "N/A";
+            }
+
+            if (typeof data.roc_auc === 'number') {
+                document.getElementById('zone-roc').textContent = data.roc_auc.toFixed(3);
+            } else {
+                document.getElementById('zone-roc').textContent = data.roc_auc;
+            }
+
+            if (typeof data.trajectory_accuracy === 'number') {
+                document.getElementById('traj-acc').textContent = (data.trajectory_accuracy * 100).toFixed(1) + '%';
+            } else {
+                document.getElementById('traj-acc').textContent = "0.0%";
+            }
+
+            document.getElementById('lstm-rmse').textContent = data.lstm_rmse.toFixed(4);
+            document.getElementById('lstm-ade').textContent = data.lstm_ade.toFixed(4);
+            document.getElementById('lstm-fde').textContent = data.lstm_fde.toFixed(4);
+
+            // Confusion Matrix Chart
+            const ctxCm = document.getElementById('cm-chart').getContext('2d');
+            const labels = data.confusion_matrix.labels;
+            const matrix = data.confusion_matrix.matrix;
+
+            // Flatten matrix for simple bar representation or use heatmap style logic
+            // Let's use a stacked bar for simplicity: For each True Label, show distribution of Predicted.
+
+            const datasets = labels.map((label, i) => {
+                // For predicted class 'label' (column i), get values across all rows (true classes)
+                // Actually standard is: dataset per predicted class? 
+                // Let's do: X-axis = True Class, Stacked Bars = Predicted Class Counts
+
+                const dataPoints = matrix.map(row => row[i]); // Get column i
+                return {
+                    label: `Pred: ${label}`,
+                    data: dataPoints,
+                    backgroundColor: getColor(i)
+                };
+            });
+
+            new Chart(ctxCm, {
+                type: 'bar',
+                data: {
+                    labels: labels.map(l => `True: ${l}`),
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    }
+                }
+            });
+
+            // Trajectory Chart & Table
+            const ctxTraj = document.getElementById('traj-chart').getContext('2d');
+            // Get first sample trip
+            const sampleKey = Object.keys(data.sample_trajectory)[0];
+            const sample = data.sample_trajectory[sampleKey];
+
+            // Actual path
+            const actualData = sample.actual.map(pt => ({ x: pt[1], y: pt[0] })); // lon, lat
+            // Predicted path
+            const predData = sample.predicted.map(pt => ({ x: pt[1], y: pt[0] }));
+
+            new Chart(ctxTraj, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Actual Path',
+                            data: actualData,
+                            borderColor: '#4CAF50',
+                            backgroundColor: '#4CAF50',
+                            showLine: true,
+                            pointRadius: 2
+                        },
+                        {
+                            label: 'Predicted Path (LSTM)',
+                            data: predData,
+                            borderColor: '#F44336',
+                            backgroundColor: '#F44336',
+                            showLine: true,
+                            borderDash: [5, 5],
+                            pointRadius: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Longitude' },
+                            type: 'linear'
+                        },
+                        y: {
+                            title: { display: true, text: 'Latitude' }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: sampleKey
+                        }
+                    }
+                }
+            });
+
+            // Populate Table
+            const tableBody = document.getElementById('data-table-body');
+            tableBody.innerHTML = '';
+
+            // Limit to e.g., 50 rows if too large, but here it's usually small per trip
+            for (let i = 0; i < sample.actual.length; i++) {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eee';
+
+                const actLatVal = sample.actual[i][0];
+                const actLonVal = sample.actual[i][1];
+                const actLat = actLatVal.toFixed(5);
+                const actLon = actLonVal.toFixed(5);
+
+                let predLat = '--';
+                let predLon = '--';
+
+                let errStr = '--';
+                let statusStr = '--';
+                let statusColor = '#333';
+
+                if (i < sample.predicted.length) {
+                    const predLatVal = sample.predicted[i][0];
+                    const predLonVal = sample.predicted[i][1];
+
+                    predLat = predLatVal.toFixed(5);
+                    predLon = predLonVal.toFixed(5);
+
+                    // Calculate Distance Error
+                    const distDeg = Math.sqrt(Math.pow(actLatVal - predLatVal, 2) + Math.pow(actLonVal - predLonVal, 2));
+                    const distMeters = distDeg * 111000; // Approx degrees to meters
+                    const isAccurate = distDeg < 0.005; // 500m threshold
+
+                    errStr = distMeters.toFixed(1) + ' m';
+                    statusStr = isAccurate ? 'Accurate' : 'Deviation';
+                    statusColor = isAccurate ? '#4CAF50' : '#F44336';
+                }
+
+                tr.innerHTML = `
+                    <td style="padding: 8px;">${i + 1}</td>
+                    <td style="padding: 8px;">${actLat}</td>
+                    <td style="padding: 8px;">${actLon}</td>
+                    <td style="padding: 8px;">${predLat}</td>
+                    <td style="padding: 8px;">${predLon}</td>
+                    <td style="padding: 8px; color: ${statusColor};">${errStr}</td>
+                    <td style="padding: 8px; font-weight: bold; color: ${statusColor};">${statusStr}</td>
+                `;
+                tableBody.appendChild(tr);
+            }
+        }
+
+
+        function getColor(index) {
+            const colors = ['#4CAF50', '#FFEB3B', '#F44336']; // Green, Yellow, Red
+            return colors[index % colors.length];
+        }
+    </script>
+</body>
+
+</html>
