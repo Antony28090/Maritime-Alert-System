@@ -1,10 +1,7 @@
 import threading
 import time
-import json
+import random
 from flask import Flask, render_template, jsonify
-import pandas as pd
-import numpy as np
-from shapely.geometry import Point
 from src.models import ZoneClassifier, TrajectoryForecaster
 from src.alert_system import AlertSystem
 from src.data_generator import generate_trajectory
@@ -14,6 +11,8 @@ from src.config import *
 
 app = Flask(__name__)
 
+state_lock = threading.Lock()
+
 # Global State
 simulation_state = {
     "lat": REF_LAT,
@@ -22,7 +21,11 @@ simulation_state = {
     "forecast_msg": "Initializing...",
     "prediction": [],  # List of [lat, lon] for predicted path
     "alert_level": "none", # none, caution, danger
-    "step": 0
+    "step": 0,
+    "actual_history": [],
+    "pred_1step_history": [],
+    "actual_zone_history": [],
+    "pred_zone_history": []
 }
 
 class SimulationThread(threading.Thread):
@@ -48,14 +51,22 @@ class SimulationThread(threading.Thread):
             # Generate a new random trip
             # Uses current time as random seed/ID
             trip_id = int(time.time())
-            trajectory_data = generate_trajectory(trip_id=trip_id, n_points=300, force_crossing=True)
             
-            # Check if this trajectory ever triggers an alert before visualizing it
+            # Mix force crossing trips with occasional normal safe trips
+            is_forced = (int(time.time()) % 3 != 0) 
+            trajectory_data = generate_trajectory(trip_id=trip_id, n_points=300, force_crossing=is_forced)
+            
+            # Check if this trajectory ever triggers an alert before visualizing it, EXCEPT if it's a normal safe trip
             has_alert = any(step['zone'] in ['DANGER', 'CAUTION'] for step in trajectory_data)
-            if not has_alert:
-                continue # Skip this path since it doesn't trigger any alerts
+            if is_forced and not has_alert:
+                continue # Skip this path since it doesn't trigger any alerts but was forced to
                 
             path_buffer = []
+            actual_history = []
+            pred_1step_history = []
+            actual_zone_history = []
+            pred_zone_history = []
+            steps_after_cross = 0
 
             for i, step in enumerate(trajectory_data):
                 if not self.running: break
@@ -65,6 +76,24 @@ class SimulationThread(threading.Thread):
                 
                 # 1. Zone Classification
                 predicted_zone = zone_model.predict(lat, lon)
+
+                if DEMO_NOISE and random.random() < 0.025:
+                    z = ["SAFE", "CAUTION", "DANGER"]
+                    if predicted_zone in z: z.remove(predicted_zone)
+                    predicted_zone = random.choice(z)
+                
+                # Actual logic to know if it really is in danger
+                actual_dist, _ = distance_from_polyline([lat, lon], IMBL_POINTS)
+                actual_sl = is_sri_lankan_side([lat, lon], IMBL_POINTS)
+                if actual_sl or actual_dist < DANGER_DIST_KM:
+                    actual_zone = "DANGER"
+                elif actual_dist < CAUTION_DIST_KM:
+                    actual_zone = "CAUTION"
+                else:
+                    actual_zone = "SAFE"
+                    
+                actual_zone_history.append(actual_zone)
+                pred_zone_history.append(predicted_zone)
                 
                 # 2. Forecasting
                 path_buffer.append([lat, lon])
@@ -74,12 +103,25 @@ class SimulationThread(threading.Thread):
                 if len(path_buffer) > LSTM_LOOKBACK:
                     recent_path = path_buffer[-(LSTM_LOOKBACK + 1):]
                     
-                    # Predict multiple steps recursively to form a trajectory line
+                    # Store data for live dashboard (1 step prediction vs actual)
+                    nxt_1_step = lstm_model.predict_next(recent_path[:-1])
+                    nxt_1_step_list = nxt_1_step.tolist() if hasattr(nxt_1_step, 'tolist') else nxt_1_step
+                    
+                    if DEMO_NOISE and random.random() < 0.025:
+                        sgn_lat = 1 if random.random() > 0.5 else -1
+                        sgn_lon = 1 if random.random() > 0.5 else -1
+                        nxt_1_step_list[0] += sgn_lat * random.uniform(0.006, 0.010)
+                        nxt_1_step_list[1] += sgn_lon * random.uniform(0.006, 0.010)
+                        
+                    actual_history.append([lat, lon])
+                    pred_1step_history.append(nxt_1_step_list)
+                    
+                    # Predict multiple steps recursively to form a trajectory line (for the map forecast line)
                     pred_path = []
                     curr_seq = recent_path.copy()
                     
-                    # Project 15 steps into the future
-                    for _ in range(15):
+                    # Project FORECAST_HORIZON steps into the future (same H as src/evaluate.py)
+                    for _ in range(FORECAST_HORIZON):
                         nxt = lstm_model.predict_next(curr_seq[-(LSTM_LOOKBACK + 1):])
                         nxt_list = nxt.tolist() if hasattr(nxt, 'tolist') else nxt
                         pred_path.append(nxt_list)
@@ -132,20 +174,31 @@ class SimulationThread(threading.Thread):
                 
                 # Update Global State
                 global simulation_state
-                simulation_state = {
-                    "lat": lat,
-                    "lon": lon,
-                    "zone": predicted_zone,
-                    "forecast_msg": forecast_msg,
-                    "prediction": prediction_path,
-                    "alert_level": alert_level,
-                    "step": i
-                }
-                
+                with state_lock:
+                    simulation_state = {
+                        "lat": lat,
+                        "lon": lon,
+                        "zone": predicted_zone,
+                        "forecast_msg": forecast_msg,
+                        "prediction": prediction_path,
+                        "alert_level": alert_level,
+                        "step": i,
+                        "actual_history": actual_history.copy(),
+                        "pred_1step_history": pred_1step_history.copy(),
+                        "actual_zone_history": actual_zone_history.copy(),
+                        "pred_zone_history": pred_zone_history.copy()
+                    }
+
                 time.sleep(1) # Speed of simulation
-            
-            print("Trip complete. Restarting new trip...")
-            time.sleep(2)
+                # If crossed the boundary, let the vessel travel a bit further before ending this trip
+                if current_is_sl:
+                    steps_after_cross += 1
+                    if steps_after_cross >= 8:
+                        print("Vessel crossed IMBL — starting a new trip.")
+                        break
+
+            if self.running:
+                print("Trip complete — starting a new trip.")
 
 @app.route('/')
 def index():
@@ -157,7 +210,8 @@ def dashboard():
 
 @app.route('/api/status')
 def get_status():
-    return jsonify(simulation_state)
+    with state_lock:
+        return jsonify(simulation_state)
 
 @app.route('/api/validation')
 def get_validation():

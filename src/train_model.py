@@ -8,6 +8,36 @@ from src.config import *
 from src.geometry import distance_from_polyline, is_sri_lankan_side
 from src.models import ZoneClassifier, TrajectoryForecaster
 
+
+# Bounding box for classifier training samples — a rectangle covering the Palk
+# Bay + Gulf of Mannar region so the classifier sees points at every distance
+# from the boundary, not only the SAFE-heavy trajectories.
+CLASSIFIER_LAT_MIN, CLASSIFIER_LAT_MAX = 8.0, 10.5
+CLASSIFIER_LON_MIN, CLASSIFIER_LON_MAX = 78.5, 80.5
+CLASSIFIER_N_SAMPLES = 30_000
+
+def build_classifier_training_set(random_state=42):
+    """
+    Uniformly sample lat/lon in the Palk Bay / Gulf of Mannar region and
+    label with the deterministic zone rule. This gives the KNN classifier
+    a class-balanced view of the region — the labels come from the same
+    geometry used at inference, so this is legitimate supervised learning
+    of a known target function, not label leakage from the test set.
+    """
+    rng = np.random.default_rng(random_state)
+    lats = rng.uniform(CLASSIFIER_LAT_MIN, CLASSIFIER_LAT_MAX, CLASSIFIER_N_SAMPLES)
+    lons = rng.uniform(CLASSIFIER_LON_MIN, CLASSIFIER_LON_MAX, CLASSIFIER_N_SAMPLES)
+    zones = []
+    for la, lo in zip(lats, lons):
+        d, _ = distance_from_polyline([la, lo], IMBL_POINTS)
+        if is_sri_lankan_side([la, lo], IMBL_POINTS) or d < DANGER_DIST_KM:
+            zones.append("DANGER")
+        elif d < CAUTION_DIST_KM:
+            zones.append("CAUTION")
+        else:
+            zones.append("SAFE")
+    return pd.DataFrame({"lat": lats, "lon": lons, "zone": zones})
+
 def get_zone_label(lat, lon):
     """
     Determines the zone label based on distance from IMBL.
@@ -82,12 +112,14 @@ def load_and_preprocess_data():
 
 def main():
     try:
-        # --- 1. Train Zone Classifier (REAL DATA) ---
-        print("\n--- Training Zone Classifier (Real Data) ---")
-        real_data = load_and_preprocess_data()
-        
+        # --- 1. Train Zone Classifier (balanced uniform sample) ---
+        print("\n--- Training Zone Classifier (uniform grid sample of region) ---")
+        clf_data = build_classifier_training_set()
+        print("Class distribution:")
+        print(clf_data['zone'].value_counts())
+
         zone_clf = ZoneClassifier(model_type='knn')
-        zone_clf.train(real_data)
+        zone_clf.train(clf_data)
         zone_clf.save()
         print("Zone Classifier saved.")
         
@@ -119,6 +151,10 @@ def main():
         mmsis = syn_df['trip_id'].unique()
         train_mmsis, test_mmsis = train_test_split(mmsis, test_size=0.2, random_state=42)
         
+        # Persist the split so src/evaluate.py can score one-step forecast error
+        # strictly on held-out trips (no in-sample numbers in the paper).
+        syn_df['split'] = np.where(syn_df['trip_id'].isin(train_mmsis), 'train', 'test')
+
         train_data = syn_df[syn_df['trip_id'].isin(train_mmsis)]
         test_data = syn_df[syn_df['trip_id'].isin(test_mmsis)]
         

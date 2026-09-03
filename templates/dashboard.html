@@ -219,7 +219,14 @@
     </div>
 
     <script>
+        let trajChart;
+        let cmChart;
+
         document.addEventListener('DOMContentLoaded', function () {
+            // Init chart empty
+            initChart();
+
+            // Fetch static validation data once
             fetch('/api/validation')
                 .then(response => response.json())
                 .then(data => {
@@ -227,12 +234,245 @@
                         showError(data.error);
                         return;
                     }
-                    renderDashboard(data);
+                    renderStaticDashboard(data);
                 })
                 .catch(err => {
                     showError("Failed to fetch validation data: " + err);
                 });
+
+            // Poll live data
+            setInterval(fetchLiveStatus, 1000);
         });
+
+        function fetchLiveStatus() {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    updateLiveMetrics(data);
+                })
+                .catch(err => console.error(err));
+        }
+
+        function initChart() {
+            const ctxTraj = document.getElementById('traj-chart').getContext('2d');
+            trajChart = new Chart(ctxTraj, {
+                type: 'line',
+                data: {
+                    datasets: [
+                        {
+                            label: 'Actual Path',
+                            data: [],
+                            borderColor: '#4CAF50',
+                            backgroundColor: '#4CAF50',
+                            showLine: true,
+                            pointRadius: 2
+                        },
+                        {
+                            label: 'Predicted Path (LSTM 1-Step)',
+                            data: [],
+                            borderColor: '#F44336',
+                            backgroundColor: '#F44336',
+                            showLine: true,
+                            borderDash: [5, 5],
+                            pointRadius: 2
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Longitude' },
+                            type: 'linear'
+                        },
+                        y: {
+                            title: { display: true, text: 'Latitude' }
+                        }
+                    },
+                    plugins: {
+                        title: { display: true, text: 'Live Trip Trajectory' }
+                    }
+                }
+            });
+
+            const ctxCm = document.getElementById('cm-chart').getContext('2d');
+            cmChart = new Chart(ctxCm, {
+                type: 'bar',
+                data: {
+                    labels: ['True: SAFE', 'True: CAUTION', 'True: DANGER'],
+                    datasets: [
+                        { label: 'Pred: SAFE', data: [0, 0, 0], backgroundColor: '#4CAF50' },
+                        { label: 'Pred: CAUTION', data: [0, 0, 0], backgroundColor: '#FFEB3B' },
+                        { label: 'Pred: DANGER', data: [0, 0, 0], backgroundColor: '#F44336' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: false,
+                    scales: {
+                        x: { stacked: true },
+                        y: { stacked: true }
+                    },
+                    plugins: {
+                        title: { display: true, text: 'Live Zone Classification Matrix' }
+                    }
+                }
+            });
+        }
+
+        function updateLiveMetrics(data) {
+            if (!data.actual_history || data.actual_history.length === 0) return;
+
+            const tableBody = document.getElementById('data-table-body');
+            tableBody.innerHTML = '';
+
+            const actualData = [];
+            const predData = [];
+
+            // Display newest rows at top of table, limited to 50 rows
+            const startIndex = Math.max(0, data.actual_history.length - 50);
+
+            for (let i = startIndex; i < data.actual_history.length; i++) {
+                const actLatVal = data.actual_history[i][0];
+                const actLonVal = data.actual_history[i][1];
+                
+                let predLat = '--';
+                let predLon = '--';
+                let errStr = '--';
+                let statusStr = '--';
+                let statusColor = '#333';
+
+                if (i < data.pred_1step_history.length && data.pred_1step_history[i] && data.pred_1step_history[i].length === 2) {
+                    const predLatVal = data.pred_1step_history[i][0];
+                    const predLonVal = data.pred_1step_history[i][1];
+                    
+                    predLat = predLatVal.toFixed(5);
+                    predLon = predLonVal.toFixed(5);
+
+                    const distDeg = Math.sqrt(Math.pow(actLatVal - predLatVal, 2) + Math.pow(actLonVal - predLonVal, 2));
+                    const distMeters = distDeg * 111000;
+                    const isAccurate = distMeters < 500;
+
+                    errStr = distMeters.toFixed(1) + ' m';
+                    statusStr = isAccurate ? 'Accurate' : 'Deviation';
+                    statusColor = isAccurate ? '#4CAF50' : '#F44336';
+                }
+
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eee';
+                tr.innerHTML = `
+                    <td style="padding: 8px;">${i + 1}</td>
+                    <td style="padding: 8px;">${actLatVal.toFixed(5)}</td>
+                    <td style="padding: 8px;">${actLonVal.toFixed(5)}</td>
+                    <td style="padding: 8px;">${predLat}</td>
+                    <td style="padding: 8px;">${predLon}</td>
+                    <td style="padding: 8px; color: ${statusColor};">${errStr}</td>
+                    <td style="padding: 8px; font-weight: bold; color: ${statusColor};">${statusStr}</td>
+                `;
+                tableBody.prepend(tr);
+            }
+
+            // Populate all data points for the chart and compute live metrics
+            let sumSqErr = 0;
+            let sumDistErr = 0;
+            let accurateCount = 0;
+            let totalPreds = 0;
+            let lastDistErr = 0;
+
+            for (let i = 0; i < data.actual_history.length; i++) {
+                const actLat = data.actual_history[i][0];
+                const actLon = data.actual_history[i][1];
+                actualData.push({ x: actLon, y: actLat });
+
+                if (i < data.pred_1step_history.length && data.pred_1step_history[i] && data.pred_1step_history[i].length === 2) {
+                    const predLat = data.pred_1step_history[i][0];
+                    const predLon = data.pred_1step_history[i][1];
+                    predData.push({ x: predLon, y: predLat });
+
+                    const distDeg = Math.sqrt(Math.pow(actLat - predLat, 2) + Math.pow(actLon - predLon, 2));
+                    
+                    sumSqErr += Math.pow(distDeg, 2);
+                    sumDistErr += distDeg;
+                    if (distDeg < 0.005) accurateCount++; // 500m accurate radius
+                    lastDistErr = distDeg;
+                    totalPreds++;
+                }
+            }
+
+            // Update Trajectory Widgets
+            if (totalPreds > 0) {
+                const rmse = Math.sqrt(sumSqErr / totalPreds);
+                const ade = sumDistErr / totalPreds;
+                const fde = lastDistErr;
+                const trajAcc = (accurateCount / totalPreds) * 100;
+
+                document.getElementById('lstm-rmse').textContent = rmse.toFixed(4);
+                document.getElementById('lstm-ade').textContent = ade.toFixed(4);
+                document.getElementById('lstm-fde').textContent = fde.toFixed(4);
+                document.getElementById('traj-acc').textContent = trajAcc.toFixed(1) + '%';
+            }
+
+            // Update Zone Widgets
+            if (data.actual_zone_history && data.pred_zone_history) {
+                let correctZone = 0;
+                let truePosDanger = 0;
+                let falsePosDanger = 0;
+                let actualDanger = 0;
+                const totalZones = data.actual_zone_history.length;
+
+                const labelToIndex = { 'SAFE': 0, 'CAUTION': 1, 'DANGER': 2 };
+                const liveMatrix = [
+                    [0, 0, 0], // True SAFE 
+                    [0, 0, 0], // True CAUTION
+                    [0, 0, 0]  // True DANGER
+                ];
+
+                for (let i = 0; i < totalZones; i++) {
+                    const actZone = data.actual_zone_history[i];
+                    const predZone = data.pred_zone_history[i];
+
+                    if (actZone === predZone) correctZone++;
+
+                    if (predZone === "DANGER" && actZone === "DANGER") truePosDanger++;
+                    if (predZone === "DANGER" && actZone !== "DANGER") falsePosDanger++;
+                    if (actZone === "DANGER") actualDanger++;
+
+                    const actIdx = labelToIndex[actZone];
+                    const predIdx = labelToIndex[predZone];
+                    if (actIdx !== undefined && predIdx !== undefined) {
+                        liveMatrix[actIdx][predIdx]++;
+                    }
+                }
+
+                if (totalZones > 0) {
+                    const zoneAcc = (correctZone / totalZones) * 100;
+                    document.getElementById('zone-acc').textContent = zoneAcc.toFixed(1) + '%';
+                }
+
+                const precision = (truePosDanger + falsePosDanger) > 0 ? (truePosDanger / (truePosDanger + falsePosDanger)) : 0;
+                const recall = actualDanger > 0 ? (truePosDanger / actualDanger) : 0;
+
+                document.getElementById('zone-precision').textContent = (truePosDanger + falsePosDanger) > 0 ? precision.toFixed(3) : "N/A";
+                document.getElementById('zone-recall').textContent = actualDanger > 0 ? recall.toFixed(3) : "N/A";
+                document.getElementById('zone-roc').textContent = "Live Run"; 
+
+                if (cmChart) {
+                    cmChart.data.datasets[0].data = [liveMatrix[0][0], liveMatrix[1][0], liveMatrix[2][0]];
+                    cmChart.data.datasets[1].data = [liveMatrix[0][1], liveMatrix[1][1], liveMatrix[2][1]];
+                    cmChart.data.datasets[2].data = [liveMatrix[0][2], liveMatrix[1][2], liveMatrix[2][2]];
+                    cmChart.update();
+                }
+            }
+
+            if (trajChart) {
+                trajChart.data.datasets[0].data = actualData;
+                trajChart.data.datasets[1].data = predData;
+                trajChart.update();
+            }
+        }
 
         function showError(msg) {
             document.getElementById('loading').style.display = 'none';
@@ -241,15 +481,12 @@
             errDiv.style.display = 'block';
         }
 
-        function renderDashboard(data) {
+        function renderStaticDashboard(data) {
             document.getElementById('loading').style.display = 'none';
             document.getElementById('dashboard-content').style.display = 'block';
 
-            // Metrics
-            // Metrics
             document.getElementById('zone-acc').textContent = (data.zone_accuracy * 100).toFixed(1) + '%';
 
-            // Extract Danger class metrics (assume Label 'DANGER' exists)
             const dangerIdx = data.zone_classification_report.labels.indexOf('DANGER');
             if (dangerIdx !== -1) {
                 document.getElementById('zone-precision').textContent = data.zone_classification_report.precision[dangerIdx].toFixed(3);
@@ -274,153 +511,10 @@
             document.getElementById('lstm-rmse').textContent = data.lstm_rmse.toFixed(4);
             document.getElementById('lstm-ade').textContent = data.lstm_ade.toFixed(4);
             document.getElementById('lstm-fde').textContent = data.lstm_fde.toFixed(4);
-
-            // Confusion Matrix Chart
-            const ctxCm = document.getElementById('cm-chart').getContext('2d');
-            const labels = data.confusion_matrix.labels;
-            const matrix = data.confusion_matrix.matrix;
-
-            // Flatten matrix for simple bar representation or use heatmap style logic
-            // Let's use a stacked bar for simplicity: For each True Label, show distribution of Predicted.
-
-            const datasets = labels.map((label, i) => {
-                // For predicted class 'label' (column i), get values across all rows (true classes)
-                // Actually standard is: dataset per predicted class? 
-                // Let's do: X-axis = True Class, Stacked Bars = Predicted Class Counts
-
-                const dataPoints = matrix.map(row => row[i]); // Get column i
-                return {
-                    label: `Pred: ${label}`,
-                    data: dataPoints,
-                    backgroundColor: getColor(i)
-                };
-            });
-
-            new Chart(ctxCm, {
-                type: 'bar',
-                data: {
-                    labels: labels.map(l => `True: ${l}`),
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: { stacked: true },
-                        y: { stacked: true }
-                    }
-                }
-            });
-
-            // Trajectory Chart & Table
-            const ctxTraj = document.getElementById('traj-chart').getContext('2d');
-            // Get first sample trip
-            const sampleKey = Object.keys(data.sample_trajectory)[0];
-            const sample = data.sample_trajectory[sampleKey];
-
-            // Actual path
-            const actualData = sample.actual.map(pt => ({ x: pt[1], y: pt[0] })); // lon, lat
-            // Predicted path
-            const predData = sample.predicted.map(pt => ({ x: pt[1], y: pt[0] }));
-
-            new Chart(ctxTraj, {
-                type: 'line',
-                data: {
-                    datasets: [
-                        {
-                            label: 'Actual Path',
-                            data: actualData,
-                            borderColor: '#4CAF50',
-                            backgroundColor: '#4CAF50',
-                            showLine: true,
-                            pointRadius: 2
-                        },
-                        {
-                            label: 'Predicted Path (LSTM)',
-                            data: predData,
-                            borderColor: '#F44336',
-                            backgroundColor: '#F44336',
-                            showLine: true,
-                            borderDash: [5, 5],
-                            pointRadius: 2
-                        }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        x: {
-                            title: { display: true, text: 'Longitude' },
-                            type: 'linear'
-                        },
-                        y: {
-                            title: { display: true, text: 'Latitude' }
-                        }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: sampleKey
-                        }
-                    }
-                }
-            });
-
-            // Populate Table
-            const tableBody = document.getElementById('data-table-body');
-            tableBody.innerHTML = '';
-
-            // Limit to e.g., 50 rows if too large, but here it's usually small per trip
-            for (let i = 0; i < sample.actual.length; i++) {
-                const tr = document.createElement('tr');
-                tr.style.borderBottom = '1px solid #eee';
-
-                const actLatVal = sample.actual[i][0];
-                const actLonVal = sample.actual[i][1];
-                const actLat = actLatVal.toFixed(5);
-                const actLon = actLonVal.toFixed(5);
-
-                let predLat = '--';
-                let predLon = '--';
-
-                let errStr = '--';
-                let statusStr = '--';
-                let statusColor = '#333';
-
-                if (i < sample.predicted.length) {
-                    const predLatVal = sample.predicted[i][0];
-                    const predLonVal = sample.predicted[i][1];
-
-                    predLat = predLatVal.toFixed(5);
-                    predLon = predLonVal.toFixed(5);
-
-                    // Calculate Distance Error
-                    const distDeg = Math.sqrt(Math.pow(actLatVal - predLatVal, 2) + Math.pow(actLonVal - predLonVal, 2));
-                    const distMeters = distDeg * 111000; // Approx degrees to meters
-                    const isAccurate = distDeg < 0.005; // 500m threshold
-
-                    errStr = distMeters.toFixed(1) + ' m';
-                    statusStr = isAccurate ? 'Accurate' : 'Deviation';
-                    statusColor = isAccurate ? '#4CAF50' : '#F44336';
-                }
-
-                tr.innerHTML = `
-                    <td style="padding: 8px;">${i + 1}</td>
-                    <td style="padding: 8px;">${actLat}</td>
-                    <td style="padding: 8px;">${actLon}</td>
-                    <td style="padding: 8px;">${predLat}</td>
-                    <td style="padding: 8px;">${predLon}</td>
-                    <td style="padding: 8px; color: ${statusColor};">${errStr}</td>
-                    <td style="padding: 8px; font-weight: bold; color: ${statusColor};">${statusStr}</td>
-                `;
-                tableBody.appendChild(tr);
-            }
         }
 
-
         function getColor(index) {
-            const colors = ['#4CAF50', '#FFEB3B', '#F44336']; // Green, Yellow, Red
+            const colors = ['#4CAF50', '#FFEB3B', '#F44336'];
             return colors[index % colors.length];
         }
     </script>

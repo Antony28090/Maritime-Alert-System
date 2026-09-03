@@ -115,30 +115,44 @@ class TrajectoryForecaster:
         """
         recent_path: list of last 'lookback' + 1 (lat, lon) absolute positions
         so we can compute 'lookback' deltas.
+
+        Uses model.__call__ instead of model.predict to bypass tf.data pipeline
+        overhead (roughly 50x faster for single samples).
         """
         if len(recent_path) < self.lookback + 1:
-            # Fallback if we don't have enough points: just repeat the last known delta
             if len(recent_path) >= 2:
                 last_delta = np.array(recent_path[-1]) - np.array(recent_path[-2])
                 return (np.array(recent_path[-1]) + last_delta).tolist()
-            return recent_path[-1] # Can't do much
-            
-        recent_points = np.array(recent_path[-(self.lookback + 1):])
+            return recent_path[-1]
+
+        recent_points = np.array(recent_path[-(self.lookback + 1):], dtype=np.float32)
         recent_deltas = np.diff(recent_points, axis=0)
-        
-        input_scaled = self.scaler.transform(recent_deltas).reshape(1, self.lookback, 2)
-        
-        # Predict next delta in scaled space
-        pred_delta_scaled = self.model.predict(input_scaled, verbose=0)[0]
-        
-        # Inverse transform delta
+
+        input_scaled = self.scaler.transform(recent_deltas).reshape(1, self.lookback, 2).astype(np.float32)
+
+        pred_delta_scaled = self.model(input_scaled, training=False).numpy()[0]
         pred_delta = self.scaler.inverse_transform([pred_delta_scaled])[0]
-        
-        # Add delta to the absolute last point
+
         last_point = recent_points[-1]
         next_point = last_point + pred_delta
-        
-        return next_point # [lat, lon]
+        return next_point
+
+    def predict_next_batch(self, recent_paths):
+        """
+        Batched form of predict_next for the evaluation harness.
+        recent_paths: array-like (B, lookback+1, 2) of absolute positions.
+        Returns (B, 2) next absolute positions. Same arithmetic as predict_next,
+        one forward pass for the whole batch.
+        """
+        arr = np.asarray(recent_paths, dtype=np.float32)
+        arr = arr[:, -(self.lookback + 1):, :]
+        deltas = np.diff(arr, axis=1)                       # (B, L, 2)
+        B = deltas.shape[0]
+        scaled = self.scaler.transform(deltas.reshape(-1, 2)) \
+                            .reshape(B, self.lookback, 2).astype(np.float32)
+        pred_scaled = self.model(scaled, training=False).numpy()   # (B, 2)
+        pred_delta = self.scaler.inverse_transform(pred_scaled)
+        return arr[:, -1, :].astype(np.float64) + pred_delta
         
     def save(self, path='models/lstm_model.keras'):
         self.model.save(path)

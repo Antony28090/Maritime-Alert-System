@@ -40,7 +40,7 @@ Instead of just alerting *after* a crossing (Reactive), this system forecasts th
 
 3.  **Train the Models** (First time only)
     ```bash
-    python -m src.train
+    python -m src.train_model
     ```
 
 4.  **Run the Dashboard**
@@ -55,14 +55,29 @@ Instead of just alerting *after* a crossing (Reactive), this system forecasts th
 ```
 Maritime-Alert-System/
 ├── src/
-│   ├── alert_system.py   # Handles Audio/TTS
-│   ├── data_generator.py # Simulates GPS data
-│   ├── models.py         # LSTM & KNN Implementations
-│   └── train.py          # Model training script
-├── static/               # CSS & JS for Dashboard
-├── templates/            # HTML Template
-├── app.py                # Flask Backend & Simulation Loop
+│   ├── alert_system.py   # Server-side audio alerts (gTTS + pygame)
+│   ├── baselines.py      # Constant-velocity, Kalman and reactive-geofence policies
+│   ├── config.py         # IMBL points, zone thresholds, FORECAST_HORIZON
+│   ├── data_generator.py # Synthetic trips: normal / forced-crossing / near-miss
+│   ├── evaluate.py       # Paper harness: AWT + false-alert sweep over H, latency
+│   ├── geometry.py       # Polyline distance & side-of-line helpers
+│   ├── models.py         # KNN Zone Classifier + LSTM Trajectory Forecaster
+│   ├── process_data.py   # Filter raw AIS CSVs into data/Processed/
+│   ├── train_model.py    # Model training entry point (writes train/test split)
+│   └── validation.py     # Metrics for /api/validation
+├── results/              # summary.json, awt.csv, far_sweep.csv (from evaluate.py)
+├── paper/                # Paper sources, figure script, figures/
+├── static/js/main.js     # Live map, HUD, and voice alerts
+├── templates/            # index.html (map) + dashboard.html (validation)
+├── app.py                # Flask backend + simulation thread
 └── requirements.txt      # Dependencies
+```
+
+## 🔬 Reproducing the paper's numbers
+```bash
+python -m src.train_model          # models + data/vessel_data.csv with split column
+python -m src.evaluate             # results/summary.json, awt.csv, far_sweep.csv
+python paper/generate_figures.py   # paper/figures/*.png
 ```
 
 ## 🔮 Future Enhancements

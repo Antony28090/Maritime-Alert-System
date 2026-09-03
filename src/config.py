@@ -29,10 +29,9 @@ IMBL_POINTS = [
     [9.6692, 79.3767],  # Pos 3: 09° 40.15' N, 79° 22.60' E
     [9.3633, 79.5117],  # Pos 4: 09° 21.80' N, 79° 30.70' E
     [9.2167, 79.5333],  # Pos 5: 09° 13' N, 79° 32' E
-    [9.1000, 79.5333],  # Pos 6: 09° 06' N, 79° 32' E (Junction)
-    
+    [9.1000, 79.5333],  # Pos 6 / Pos 1m: 09° 06' N, 79° 32' E (Palk Strait ↔ Gulf of Mannar junction)
+
     # Gulf of Mannar (1976 Agreement)
-    [9.1000, 79.5333],  # Pos 1m: Same as Pos 6
     [9.0000, 79.5217],  # Pos 2m: 09°00'.0 N, 79°31'.3 E
     [8.8967, 79.4883],  # Pos 3m: 08°53'.8 N, 79°29'.3 E
     [8.6667, 79.3200],  # Pos 4m: 08°40'.0 N, 79°19'.4 E (Approx from source)
@@ -49,5 +48,10 @@ CAUTION_DIST_KM = 5.0  # < 5 km from border (but > 2km)
 # Safe is > 5 km
 
 # Model Config
-LSTM_LOOKBACK = 5  # Number of past steps to look at for prediction
-PREDICT_STEPS = 6  # Predict next 6 steps (e.g., next 1 hour if step=10min)
+LSTM_LOOKBACK = 5       # Number of past steps to look at for prediction
+FORECAST_HORIZON = 15   # Ticks the forecaster is rolled out per step. Shared by
+                        # the live dashboard (app.py) and the evaluation harness
+                        # (src/evaluate.py) so reported AWT matches what ships.
+
+# Simulation Config
+DEMO_NOISE = False  # If True, inject synthetic prediction errors in the live sim (demo only)

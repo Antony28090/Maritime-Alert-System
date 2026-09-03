@@ -1,37 +1,34 @@
 # How to Use Real-Life GPS Data
 
-Currently, the system uses a **Simulation** to generate boat movement. To use **Real-Life Data** (e.g., from a GPS module on a boat), follow these steps.
+By default the system runs `SimulationThread` in `app.py`, which calls `generate_trajectory()` from `src/data_generator.py` to produce a synthetic path. To feed **real GPS data** from a hardware receiver instead, replace the trajectory source inside the thread's `run()` loop.
 
 ## 1. Hardware Requirements
-You will need a GPS Receiver module. Common options include:
--   **Neo-6M GPS Module**: Cheap and works well with Raspberry Pi/Arduino.
--   **USB GPS Receiver**: Plugs directly into a laptop.
+Any receiver that emits NMEA sentences over serial works. Common options:
+- **Neo-6M / Neo-M8N GPS module** — pairs well with Raspberry Pi or Arduino.
+- **USB GPS receiver** — plugs directly into a laptop and appears as a serial COM port.
 
-## 2. Install Python GPS Library
-If you are using a Raspberry Pi/Laptop with a GPS module connected via Serial (USB/UART):
+## 2. Install the Extra Python Libraries
 ```bash
 pip install pyserial pynmea2
 ```
 
-## 3. Modify the Code (`app.py`)
+## 3. Add a GPS Reader
 
-You need to edit the `SimulationThread` class in `app.py`. Instead of generating a random point, you will read from the GPS.
-
-### Step A: Add a GPS Reading Function
-Add this function to `app.py` (or a sidebar utility):
+Add a helper near the top of `app.py`:
 
 ```python
 import serial
 import pynmea2
 
-# Configure your Serial Port (Check device manager/ls /dev/tty*)
-# Windows: 'COM3', Linux/RPi: '/dev/ttyUSB0' or '/dev/ttyS0'
-def get_live_gps_coordinates():
+# Windows: 'COM3'.  Linux/Raspberry Pi: '/dev/ttyUSB0' or '/dev/ttyS0'.
+GPS_PORT = 'COM3'
+
+def read_gps_fix():
     try:
-        with serial.Serial('COM3', baudrate=9600, timeout=1) as ser:
-            for _ in range(10): # Try reading a few lines
-                line = ser.readline().decode('utf-8')
-                if line.startswith('$GPGGA'): # NMEA format for Position
+        with serial.Serial(GPS_PORT, baudrate=9600, timeout=1) as ser:
+            for _ in range(10):
+                line = ser.readline().decode('utf-8', errors='ignore')
+                if line.startswith('$GPGGA') or line.startswith('$GPRMC'):
                     msg = pynmea2.parse(line)
                     if msg.latitude and msg.longitude:
                         return msg.latitude, msg.longitude
@@ -40,31 +37,34 @@ def get_live_gps_coordinates():
     return None, None
 ```
 
-### Step B: Update the Loop
-In `app.py`, find the `SimulationThread` class. Change the `run` method:
+## 4. Swap the Trajectory Source
 
-**Current (Simulation):**
+In `SimulationThread.run()` (see `app.py`), the current loop iterates a synthetic list:
+
 ```python
-# ... inside the loop ...
-# Simulate next point based on previous
-next_lat = self.current_lat + (velocity_lat * 0.01)
-next_lon = self.current_lon + (velocity_lon * 0.01)
+trajectory_data = generate_trajectory(trip_id=trip_id, n_points=300, force_crossing=is_forced)
+for i, step in enumerate(trajectory_data):
+    lat = step['lat']
+    lon = step['lon']
+    # ... zone classification, forecasting, alerts ...
 ```
 
-**New (Real Data):**
-```python
-# ... inside the loop ...
-real_lat, real_lon = get_live_gps_coordinates()
+Replace the outer generator + `for` with a live-polling loop:
 
-if real_lat is not None:
-    self.path.append((real_lat, real_lon))
-    # Update current position for the Zone Classifier
-    # ... rest of the logic remains the same ...
-else:
-    print("Waiting for GPS signal...")
+```python
+i = 0
+while self.running:
+    lat, lon = read_gps_fix()
+    if lat is None:
+        time.sleep(1)
+        continue
+    # ... reuse the rest of the loop body (zone classification, forecasting, alerts) ...
+    i += 1
 ```
 
-## 4. Testing
-1.  Connect your GPS hardware.
-2.  Run `app.py`.
-3.  The map should now show your physical location moving in real-time!
+Everything downstream — `zone_model.predict(lat, lon)`, the LSTM path buffer, the alert triggers, the `simulation_state` update — stays the same.
+
+## 5. Test
+1. Connect the GPS receiver and confirm the serial port name.
+2. Run `python app.py`.
+3. Open `http://127.0.0.1:5000` — the boat marker should track your physical location.

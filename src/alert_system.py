@@ -62,22 +62,3 @@ class AlertSystem:
                 # Fallback to system beep if audio fails
                 import winsound
                 winsound.Beep(1000, 500) # Freq, Duration
-
-    def check_zone(self, lat, lon):
-        """
-        Determines the zone based on distance from IMBL.
-        """
-        from src.config import IMBL_POINTS, DANGER_DIST_KM, CAUTION_DIST_KM
-        from src.geometry import distance_from_polyline, is_sri_lankan_side
-        
-        dist, _ = distance_from_polyline([lat, lon], IMBL_POINTS)
-        is_sl = is_sri_lankan_side([lat, lon], IMBL_POINTS)
-        
-        if is_sl:
-            return "DANGER"
-        elif dist < DANGER_DIST_KM:
-            return "DANGER"
-        elif dist < CAUTION_DIST_KM:
-            return "CAUTION"
-        else:
-            return "SAFE"

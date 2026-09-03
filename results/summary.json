@@ -1,0 +1,751 @@
+{
+  "config": {
+    "n_forced_trips": 50,
+    "n_near_miss_trips": 50,
+    "trip_len_forced": 150,
+    "trip_len_near_miss": 220,
+    "post_cross_ticks": 5,
+    "horizons": [
+      5,
+      10,
+      15,
+      20
+    ],
+    "predicates": [
+      "buffer",
+      "crossing"
+    ],
+    "default_forecast_horizon": 15,
+    "lstm_lookback": 5,
+    "danger_km": 2.0,
+    "caution_km": 5.0,
+    "seeds": {
+      "forced": 20260811,
+      "near_miss": 20260812
+    },
+    "trip_generation": {
+      "forced_generated": 50,
+      "near_miss_generator_calls": 63
+    },
+    "one_step_eval_set": "held-out trips (split == 'test' in data/vessel_data.csv)",
+    "one_step_eval_trips": 40,
+    "wall_clock_s": 229.2397821000195
+  },
+  "model": {
+    "lstm_trainable_params": 10702
+  },
+  "zone_classifier_uniform": {
+    "n": 20000,
+    "accuracy": 0.99455,
+    "confusion_matrix": {
+      "labels": [
+        "CAUTION",
+        "DANGER",
+        "SAFE"
+      ],
+      "matrix": [
+        [
+          228,
+          30,
+          14
+        ],
+        [
+          15,
+          10061,
+          4
+        ],
+        [
+          41,
+          5,
+          9602
+        ]
+      ]
+    },
+    "per_class": {
+      "CAUTION": {
+        "precision": 0.8028169014084507,
+        "recall": 0.8382352941176471,
+        "f1": 0.8201438848920863
+      },
+      "DANGER": {
+        "precision": 0.9965332805071315,
+        "recall": 0.9981150793650794,
+        "f1": 0.9973235527359239
+      },
+      "SAFE": {
+        "precision": 0.9981288981288982,
+        "recall": 0.9952321724709784,
+        "f1": 0.9966784305584389
+      }
+    }
+  },
+  "zone_classifier_trajectories": {
+    "n": 10000,
+    "note": "classifier was trained on a uniform grid, so every trajectory fix is out-of-sample",
+    "accuracy": 0.9816,
+    "confusion_matrix": {
+      "labels": [
+        "CAUTION",
+        "DANGER",
+        "SAFE"
+      ],
+      "matrix": [
+        [
+          373,
+          34,
+          19
+        ],
+        [
+          50,
+          1976,
+          1
+        ],
+        [
+          80,
+          0,
+          7467
+        ]
+      ]
+    },
+    "per_class": {
+      "CAUTION": {
+        "precision": 0.7415506958250497,
+        "recall": 0.8755868544600939,
+        "f1": 0.8030139935414424
+      },
+      "DANGER": {
+        "precision": 0.9830845771144279,
+        "recall": 0.9748396645288604,
+        "f1": 0.9789447609611097
+      },
+      "SAFE": {
+        "precision": 0.9973287030853479,
+        "recall": 0.9893997614946336,
+        "f1": 0.9933484102700545
+      }
+    },
+    "roc_auc_ovr": 0.9970995354102805
+  },
+  "trajectory_1step_heldout": {
+    "LSTM": {
+      "n_samples": 1760,
+      "mse_deg2": 1.6833193752733339e-06,
+      "mae_deg": 0.0008717422928543666,
+      "rmse_deg": 0.0012974279846193137,
+      "ade_deg": 0.0013676926938901268,
+      "fde_deg": 0.0028403639234128664,
+      "ade_m_approx": 152.2515506838489,
+      "rmse_m_approx": 144.429683247822
+    },
+    "ConstVel": {
+      "n_samples": 1760,
+      "mse_deg2": 1.7309444558902632e-06,
+      "mae_deg": 0.0008983840944965435,
+      "rmse_deg": 0.001315653623067357,
+      "ade_deg": 0.0014165755908411217,
+      "fde_deg": 0.0023072306197433065,
+      "ade_m_approx": 157.69319477243366,
+      "rmse_m_approx": 146.45856131985818
+    },
+    "Kalman": {
+      "n_samples": 1760,
+      "mse_deg2": 1.7854053462738682e-06,
+      "mae_deg": 0.0008927387062731339,
+      "rmse_deg": 0.0013361906100081186,
+      "ade_deg": 0.0014022357622551173,
+      "fde_deg": 0.0024016681104082876,
+      "ade_m_approx": 156.09688505423966,
+      "rmse_m_approx": 148.74473870610376
+    }
+  },
+  "horizon_sweep": {
+    "reactive": {
+      "awt": {
+        "trips": 50,
+        "trips_with_advance_warning": 50,
+        "advance_warning_rate": 1.0,
+        "awt_mean": 1.72,
+        "awt_median": 2.0,
+        "awt_p25": 1.0,
+        "awt_p75": 2.0,
+        "awt_std": 0.607436903584837
+      },
+      "false_alert": {
+        "trips": 50,
+        "trips_with_false_alert": 0,
+        "false_alert_rate": 0.0,
+        "median_first_false_alert_tick": null,
+        "d_min_km_mean": 2.912411323851236,
+        "d_min_km_min": 2.0493054470355907
+      }
+    },
+    "by_predicate": {
+      "buffer": {
+        "5": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 6.18,
+              "awt_median": 6.0,
+              "awt_p25": 6.0,
+              "awt_p75": 7.0,
+              "awt_std": 0.7196938124462857
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 37,
+              "false_alert_rate": 0.74,
+              "median_first_false_alert_tick": 43.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 6.72,
+            "eq1_residual_ticks": -0.54
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 6.76,
+              "awt_median": 7.0,
+              "awt_p25": 6.0,
+              "awt_p75": 7.0,
+              "awt_std": 0.7969328960560773
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 39,
+              "false_alert_rate": 0.78,
+              "median_first_false_alert_tick": 44.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 6.72,
+            "eq1_residual_ticks": 0.040000000000000036
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 6.68,
+              "awt_median": 7.0,
+              "awt_p25": 6.0,
+              "awt_p75": 7.0,
+              "awt_std": 0.7938539422542745
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 42,
+              "false_alert_rate": 0.84,
+              "median_first_false_alert_tick": 44.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 6.72,
+            "eq1_residual_ticks": -0.040000000000000036
+          }
+        },
+        "10": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 9.96,
+              "awt_median": 10.0,
+              "awt_p25": 10.0,
+              "awt_p75": 11.0,
+              "awt_std": 1.3991250910508906
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 46,
+              "false_alert_rate": 0.92,
+              "median_first_false_alert_tick": 38.5,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 11.72,
+            "eq1_residual_ticks": -1.7599999999999998
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 12.04,
+              "awt_median": 12.0,
+              "awt_p25": 11.0,
+              "awt_p75": 13.0,
+              "awt_std": 1.6654961876331056
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 39.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 11.72,
+            "eq1_residual_ticks": 0.3199999999999985
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 11.78,
+              "awt_median": 11.0,
+              "awt_p25": 11.0,
+              "awt_p75": 12.0,
+              "awt_std": 1.5816550360496515
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 39.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 11.72,
+            "eq1_residual_ticks": 0.05999999999999872
+          }
+        },
+        "15": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 13.9,
+              "awt_median": 14.0,
+              "awt_p25": 13.0,
+              "awt_p75": 15.0,
+              "awt_std": 2.2519832529192065
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 46,
+              "false_alert_rate": 0.92,
+              "median_first_false_alert_tick": 34.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 16.72,
+            "eq1_residual_ticks": -2.8199999999999985
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 17.02,
+              "awt_median": 17.0,
+              "awt_p25": 16.0,
+              "awt_p75": 18.0,
+              "awt_std": 2.965722543341105
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 33.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 16.72,
+            "eq1_residual_ticks": 0.3000000000000007
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 16.56,
+              "awt_median": 16.0,
+              "awt_p25": 16.0,
+              "awt_p75": 18.0,
+              "awt_std": 2.5407696086189384
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 34.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 16.72,
+            "eq1_residual_ticks": -0.16000000000000014
+          }
+        },
+        "20": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 16.64,
+              "awt_median": 17.0,
+              "awt_p25": 15.25,
+              "awt_p75": 18.0,
+              "awt_std": 3.173615719442711
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 46,
+              "false_alert_rate": 0.92,
+              "median_first_false_alert_tick": 30.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 21.72,
+            "eq1_residual_ticks": -5.079999999999998
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 20.06,
+              "awt_median": 21.0,
+              "awt_p25": 18.25,
+              "awt_p75": 22.0,
+              "awt_std": 3.883034790427903
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 26.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 21.72,
+            "eq1_residual_ticks": -1.6600000000000001
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 19.74,
+              "awt_median": 21.0,
+              "awt_p25": 18.25,
+              "awt_p75": 22.0,
+              "awt_std": 3.6466926586893464
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 28.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 21.72,
+            "eq1_residual_ticks": -1.9800000000000004
+          }
+        }
+      },
+      "crossing": {
+        "5": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 4.46,
+              "awt_median": 5.0,
+              "awt_p25": 4.0,
+              "awt_p75": 5.0,
+              "awt_std": 0.7615773105863908
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 4,
+              "false_alert_rate": 0.08,
+              "median_first_false_alert_tick": 48.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 5.0,
+            "eq1_residual_ticks": -0.54
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 5.0,
+              "awt_median": 5.0,
+              "awt_p25": 5.0,
+              "awt_p75": 5.0,
+              "awt_std": 0.6060915267313265
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 5,
+              "false_alert_rate": 0.1,
+              "median_first_false_alert_tick": 49.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 5.0,
+            "eq1_residual_ticks": 0.0
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 5.0,
+              "awt_median": 5.0,
+              "awt_p25": 5.0,
+              "awt_p75": 5.0,
+              "awt_std": 0.4948716593053935
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 5,
+              "false_alert_rate": 0.1,
+              "median_first_false_alert_tick": 49.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 5.0,
+            "eq1_residual_ticks": 0.0
+          }
+        },
+        "10": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 8.32,
+              "awt_median": 9.0,
+              "awt_p25": 8.0,
+              "awt_p75": 9.0,
+              "awt_std": 1.504279609267221
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 41,
+              "false_alert_rate": 0.82,
+              "median_first_false_alert_tick": 40.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 10.0,
+            "eq1_residual_ticks": -1.6799999999999997
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 10.38,
+              "awt_median": 10.0,
+              "awt_p25": 10.0,
+              "awt_p75": 11.0,
+              "awt_std": 1.2759950099064346
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 45,
+              "false_alert_rate": 0.9,
+              "median_first_false_alert_tick": 39.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 10.0,
+            "eq1_residual_ticks": 0.3800000000000008
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 10.22,
+              "awt_median": 10.0,
+              "awt_p25": 9.25,
+              "awt_p75": 11.0,
+              "awt_std": 1.217055664214221
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 45,
+              "false_alert_rate": 0.9,
+              "median_first_false_alert_tick": 40.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 10.0,
+            "eq1_residual_ticks": 0.22000000000000064
+          }
+        },
+        "15": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 11.54,
+              "awt_median": 12.0,
+              "awt_p25": 11.0,
+              "awt_p75": 13.0,
+              "awt_std": 2.366518151898545
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 44,
+              "false_alert_rate": 0.88,
+              "median_first_false_alert_tick": 36.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 15.0,
+            "eq1_residual_ticks": -3.460000000000001
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 15.72,
+              "awt_median": 16.0,
+              "awt_p25": 15.0,
+              "awt_p75": 16.75,
+              "awt_std": 2.3215054932310717
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 46,
+              "false_alert_rate": 0.92,
+              "median_first_false_alert_tick": 34.5,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 15.0,
+            "eq1_residual_ticks": 0.7200000000000006
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 15.2,
+              "awt_median": 15.0,
+              "awt_p25": 14.0,
+              "awt_p75": 16.0,
+              "awt_std": 2.294625486315573
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 46,
+              "false_alert_rate": 0.92,
+              "median_first_false_alert_tick": 35.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 15.0,
+            "eq1_residual_ticks": 0.1999999999999993
+          }
+        },
+        "20": {
+          "LSTM": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 15.24,
+              "awt_median": 16.0,
+              "awt_p25": 14.0,
+              "awt_p75": 17.0,
+              "awt_std": 3.133492541909759
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 45,
+              "false_alert_rate": 0.9,
+              "median_first_false_alert_tick": 32.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 20.0,
+            "eq1_residual_ticks": -4.76
+          },
+          "ConstVel": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 19.38,
+              "awt_median": 20.0,
+              "awt_p25": 18.0,
+              "awt_p75": 21.0,
+              "awt_std": 3.6020968949788577
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 30.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 20.0,
+            "eq1_residual_ticks": -0.620000000000001
+          },
+          "Kalman": {
+            "awt": {
+              "trips": 50,
+              "trips_with_advance_warning": 50,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 19.18,
+              "awt_median": 20.0,
+              "awt_p25": 18.0,
+              "awt_p75": 21.0,
+              "awt_std": 3.438616238060458
+            },
+            "false_alert": {
+              "trips": 50,
+              "trips_with_false_alert": 47,
+              "false_alert_rate": 0.94,
+              "median_first_false_alert_tick": 30.0,
+              "d_min_km_mean": 2.912411323851236,
+              "d_min_km_min": 2.0493054470355907
+            },
+            "eq1_predicted_awt_mean": 20.0,
+            "eq1_residual_ticks": -0.8200000000000003
+          }
+        }
+      }
+    }
+  },
+  "latency": {
+    "ticks": 1000,
+    "horizon": 15,
+    "all_ticks": {
+      "mean_ms": 113.30514409963507,
+      "median_ms": 117.10869999660645,
+      "p95_ms": 122.38210000068648,
+      "p99_ms": 124.03508298564702
+    },
+    "full_alerting_step": {
+      "n": 958,
+      "mean_ms": 117.48439655499485,
+      "median_ms": 117.27570000221021,
+      "p95_ms": 122.46024998894427,
+      "p99_ms": 124.04276899527758
+    },
+    "note": "single-vessel deployment path (zone predict + 1-step + H-step un-batched rollout + buffer predicate); 'full_alerting_step' excludes the first lookback ticks where only the zone classifier runs. Measure with the machine otherwise idle."
+  }
+}

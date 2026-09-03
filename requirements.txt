@@ -1,9 +1,9 @@
+flask
 pandas
-geopandas
 numpy
 scikit-learn
 tensorflow
-gTTS
-playsound
-matplotlib
 shapely
+gTTS
+pygame
+joblib

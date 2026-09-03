@@ -1,5 +1,5 @@
 // Initialize Map
-var map = L.map('map').setView([9.2872, 79.3130], 10); // Start near Rameswaram
+var map = L.map('map').setView([9.2872, 79.3130], 9); // Start near Rameswaram
 
 // Light Mode Tiles (OpenStreetMap)
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -20,31 +20,55 @@ var dangerZoneLayer = null;
 var pathLine = L.polyline([], { color: '#00bcd4', weight: 4 }).addTo(map); // Cyan
 var forecastLine = L.polyline([], { color: '#ef6c00', dashArray: '5, 10', weight: 4 }).addTo(map); // Dark Orange
 
+// Voice Alert State
+var lastSpeechTime = 0;
+var speechCooldown = 15000; // 15 seconds
+var lastAlertState = null;
+
+function speakAlert(message, force) {
+    if (!window.speechSynthesis) return;
+
+    // Only speak if forced (i.e. state has changed)
+    if (!force) return;
+
+    var now = Date.now();
+
+    // Cancel any current speech
+    window.speechSynthesis.cancel();
+
+    var utterance = new SpeechSynthesisUtterance(message);
+    utterance.lang = 'ta-IN'; // Tamil India
+    utterance.rate = 1.0;
+
+    window.speechSynthesis.speak(utterance);
+    lastSpeechTime = now;
+}
+
 // Fetch Configuration (Boundaries)
 fetch('/api/config')
     .then(response => response.json())
     .then(config => {
-        // Visualize Danger Zone (Red transparent strip) - "Zone Visualization"
-        dangerZoneLayer = L.polyline([
-            config.imbl_start,
-            config.imbl_end
-        ], {
-            color: 'red',
-            weight: 80, // Wide strip
-            opacity: 0.2,
-            lineCap: 'butt'
-        }).addTo(map);
-        dangerZoneLayer.bindPopup("Danger Zone (< 2km)");
+        if (config.imbl_points) {
+            // Visualize Danger Zone (Red transparent strip) - "Zone Visualization"
+            dangerZoneLayer = L.polyline(config.imbl_points, {
+                color: 'red',
+                weight: 60, // Wide strip
+                opacity: 0.2,
+                lineCap: 'butt'
+            }).addTo(map);
+            dangerZoneLayer.bindPopup("Danger Zone (< 2km)");
 
-        // Draw IMBL
-        imblLine = L.polyline([
-            config.imbl_start,
-            config.imbl_end
-        ], { color: 'red', weight: 3, dashArray: '10, 10' }).addTo(map);
-        imblLine.bindPopup("IMBL (Maritime Boundary)");
+            // Draw IMBL
+            imblLine = L.polyline(config.imbl_points, {
+                color: 'red',
+                weight: 3,
+                dashArray: '10, 10'
+            }).addTo(map);
+            imblLine.bindPopup("International Maritime Boundary Line (India-Sri Lanka)");
 
-        // Fit bounds
-        map.fitBounds(imblLine.getBounds());
+            // Fit bounds
+            map.fitBounds(imblLine.getBounds());
+        }
     });
 
 // Poll Status
@@ -54,6 +78,17 @@ function updateStatus() {
         .then(data => {
             var lat = data.lat;
             var lon = data.lon;
+
+            // Clear path if this is a new trip
+            var iconElement = vesselMarker.getElement();
+            if (data.step === 0) {
+                pathLine.setLatLngs([]);
+                // Disable transition to instantly snap boat to the new start point
+                if (iconElement) iconElement.style.transition = 'none';
+            } else {
+                // Enable smooth 1-second CSS transitions for ~60fps movement interpolation
+                if (iconElement) iconElement.style.transition = 'transform 1s linear';
+            }
 
             // Update Marker
             var newLatLng = new L.LatLng(lat, lon);
@@ -78,17 +113,37 @@ function updateStatus() {
 
             // Alert Box
             var alertBox = document.getElementById('alert-box');
-            if (data.alert_level === 'danger') {
+            var currentAlertLevel = data.alert_level;
+
+            if (currentAlertLevel === 'crossed') {
                 alertBox.style.display = 'block';
                 alertBox.className = 'alert-danger';
-                alertBox.innerText = "DANGER! TURN BACK!";
-            } else if (data.alert_level === 'caution') {
+                alertBox.innerText = "BOUNDARY CROSSED! TURN BACK!";
+
+                var forceAudio = (lastAlertState !== 'crossed');
+                speakAlert("எச்சரிக்கை! நீங்கள் எல்லையைத் தாண்டிவிட்டீர்கள். உடனடியாகத் திரும்பிச் செல்லவும்.", forceAudio);
+
+            } else if (currentAlertLevel === 'danger') {
+                alertBox.style.display = 'block';
+                alertBox.className = 'alert-danger';
+                alertBox.innerText = "DANGER! HIGH RISK OF CROSSING!";
+
+                var forceAudio = (lastAlertState !== 'danger');
+                speakAlert("எச்சரிக்கை! நீங்கள் எல்லை தாண்டும் அபாயத்தில் உள்ளீர்கள். உடனே திரும்புங்கள்.", forceAudio);
+
+            } else if (currentAlertLevel === 'caution') {
                 alertBox.style.display = 'block';
                 alertBox.className = 'alert-caution';
                 alertBox.innerText = "CAUTION: APPROACHING BOUNDARY";
+
+                // Optional: Caution voice
+                // speakAlert("கவனிக்கவும். நீங்கள் எல்லையை நெருங்குகிறீர்கள்.");
+
             } else {
                 alertBox.style.display = 'none';
             }
+
+            lastAlertState = currentAlertLevel;
         })
         .catch(err => console.error("Error fetching status:", err));
 }
