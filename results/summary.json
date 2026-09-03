@@ -1,7 +1,28 @@
 {
   "config": {
-    "n_forced_trips": 50,
-    "n_near_miss_trips": 50,
+    "n_forced_trips_per_seed": 50,
+    "n_near_miss_trips_per_seed": 50,
+    "n_seeds": 3,
+    "seeds": {
+      "seed0": {
+        "forced": 20260811,
+        "near_miss": 20260812,
+        "forced_generated": 50,
+        "near_miss_generator_calls": 63
+      },
+      "seed1": {
+        "forced": 20260901,
+        "near_miss": 20260902,
+        "forced_generated": 50,
+        "near_miss_generator_calls": 64
+      },
+      "seed2": {
+        "forced": 20260903,
+        "near_miss": 20260904,
+        "forced_generated": 50,
+        "near_miss_generator_calls": 72
+      }
+    },
     "trip_len_forced": 150,
     "trip_len_near_miss": 220,
     "post_cross_ticks": 5,
@@ -15,21 +36,34 @@
       "buffer",
       "crossing"
     ],
+    "policies": [
+      "LSTM",
+      "ConstVel",
+      "Kalman",
+      "Analytic"
+    ],
+    "approach_bins_km": [
+      [
+        0.0,
+        2.5
+      ],
+      [
+        2.5,
+        3.5
+      ],
+      [
+        3.5,
+        99.0
+      ]
+    ],
+    "bootstrap_resamples": 1000,
     "default_forecast_horizon": 15,
     "lstm_lookback": 5,
     "danger_km": 2.0,
     "caution_km": 5.0,
-    "seeds": {
-      "forced": 20260811,
-      "near_miss": 20260812
-    },
-    "trip_generation": {
-      "forced_generated": 50,
-      "near_miss_generator_calls": 63
-    },
     "one_step_eval_set": "held-out trips (split == 'test' in data/vessel_data.csv)",
     "one_step_eval_trips": 40,
-    "wall_clock_s": 229.2397821000195
+    "wall_clock_s": 837.7330911000026
   },
   "model": {
     "lstm_trainable_params": 10702
@@ -133,8 +167,16 @@
       "mae_deg": 0.0008717422928543666,
       "rmse_deg": 0.0012974279846193137,
       "ade_deg": 0.0013676926938901268,
+      "ade_deg_ci95": [
+        0.001311520991620582,
+        0.001428872297173928
+      ],
       "fde_deg": 0.0028403639234128664,
       "ade_m_approx": 152.2515506838489,
+      "ade_m_ci95": [
+        146.29812078939779,
+        158.6753933955881
+      ],
       "rmse_m_approx": 144.429683247822
     },
     "ConstVel": {
@@ -143,8 +185,16 @@
       "mae_deg": 0.0008983840944965435,
       "rmse_deg": 0.001315653623067357,
       "ade_deg": 0.0014165755908411217,
+      "ade_deg_ci95": [
+        0.0013611055731120195,
+        0.0014781844845741302
+      ],
       "fde_deg": 0.0023072306197433065,
       "ade_m_approx": 157.69319477243366,
+      "ade_m_ci95": [
+        151.76384200392195,
+        164.67686013441318
+      ],
       "rmse_m_approx": 146.45856131985818
     },
     "Kalman": {
@@ -153,30 +203,80 @@
       "mae_deg": 0.0008927387062731339,
       "rmse_deg": 0.0013361906100081186,
       "ade_deg": 0.0014022357622551173,
+      "ade_deg_ci95": [
+        0.0013423242120887023,
+        0.0014675738924272458
+      ],
       "fde_deg": 0.0024016681104082876,
-      "ade_m_approx": 156.09688505423966,
+      "ade_m_approx": 156.09688505423964,
+      "ade_m_ci95": [
+        149.99483491128362,
+        163.23847405194843
+      ],
       "rmse_m_approx": 148.74473870610376
     }
   },
   "horizon_sweep": {
     "reactive": {
       "awt": {
-        "trips": 50,
-        "trips_with_advance_warning": 50,
+        "trips": 150,
+        "trips_with_advance_warning": 150,
         "advance_warning_rate": 1.0,
-        "awt_mean": 1.72,
+        "awt_mean": 1.7266666666666666,
+        "awt_mean_ci95": [
+          1.6333333333333333,
+          1.8333333333333333
+        ],
         "awt_median": 2.0,
         "awt_p25": 1.0,
         "awt_p75": 2.0,
-        "awt_std": 0.607436903584837
+        "awt_std": 0.6439878554303913,
+        "per_seed_mean": {
+          "0": 1.72,
+          "1": 1.82,
+          "2": 1.64
+        },
+        "across_seed_std": 0.09018499505645797
       },
       "false_alert": {
-        "trips": 50,
+        "trips": 150,
         "trips_with_false_alert": 0,
         "false_alert_rate": 0.0,
+        "false_alert_rate_ci95": [
+          0.0,
+          0.0
+        ],
         "median_first_false_alert_tick": null,
-        "d_min_km_mean": 2.912411323851236,
-        "d_min_km_min": 2.0493054470355907
+        "per_seed_rate": {
+          "0": 0.0,
+          "1": 0.0,
+          "2": 0.0
+        },
+        "across_seed_std": 0.0,
+        "by_closest_approach_km": {
+          "0-2.5": {
+            "n": 40,
+            "false_alert_rate": 0.0
+          },
+          "2.5-3.5": {
+            "n": 92,
+            "false_alert_rate": 0.0
+          },
+          "3.5-99": {
+            "n": 18,
+            "false_alert_rate": 0.0
+          }
+        }
+      }
+    },
+    "near_miss_closest_approach": {
+      "d_min_km_mean": 2.8749954133277695,
+      "d_min_km_min": 2.0493054470355907,
+      "d_min_km_max": 4.275987794477725,
+      "n_by_bin": {
+        "0-2.5": 40,
+        "2.5-3.5": 92,
+        "3.5-99": 18
       }
     },
     "by_predicate": {
@@ -184,273 +284,873 @@
         "5": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 6.18,
+              "awt_mean": 6.1466666666666665,
+              "awt_mean_ci95": [
+                6.046666666666667,
+                6.246666666666667
+              ],
               "awt_median": 6.0,
               "awt_p25": 6.0,
               "awt_p75": 7.0,
-              "awt_std": 0.7196938124462857
+              "awt_std": 0.6694349682633712,
+              "per_seed_mean": {
+                "0": 6.18,
+                "1": 6.08,
+                "2": 6.18
+              },
+              "across_seed_std": 0.05773502691896237
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 37,
-              "false_alert_rate": 0.74,
-              "median_first_false_alert_tick": 43.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 108,
+              "false_alert_rate": 0.72,
+              "false_alert_rate_ci95": [
+                0.6533333333333333,
+                0.7866666666666666
+              ],
+              "median_first_false_alert_tick": 51.0,
+              "per_seed_rate": {
+                "0": 0.74,
+                "1": 0.74,
+                "2": 0.68
+              },
+              "across_seed_std": 0.03464101615137751,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.7065217391304348
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.16666666666666666
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 6.72,
-            "eq1_residual_ticks": -0.54
+            "eq1_predicted_awt_mean": 6.726666666666667,
+            "eq1_residual_ticks": -0.5800000000000001
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 6.76,
+              "awt_mean": 6.786666666666667,
+              "awt_mean_ci95": [
+                6.6466666666666665,
+                6.94
+              ],
               "awt_median": 7.0,
               "awt_p25": 6.0,
               "awt_p75": 7.0,
-              "awt_std": 0.7969328960560773
+              "awt_std": 0.8867909620033505,
+              "per_seed_mean": {
+                "0": 6.76,
+                "1": 6.86,
+                "2": 6.74
+              },
+              "across_seed_std": 0.06429100507328651
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 39,
-              "false_alert_rate": 0.78,
-              "median_first_false_alert_tick": 44.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 121,
+              "false_alert_rate": 0.8066666666666666,
+              "false_alert_rate_ci95": [
+                0.74,
+                0.8666666666666667
+              ],
+              "median_first_false_alert_tick": 50.0,
+              "per_seed_rate": {
+                "0": 0.78,
+                "1": 0.84,
+                "2": 0.8
+              },
+              "across_seed_std": 0.030550504633038898,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.8369565217391305
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.2222222222222222
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 6.72,
-            "eq1_residual_ticks": 0.040000000000000036
+            "eq1_predicted_awt_mean": 6.726666666666667,
+            "eq1_residual_ticks": 0.0600000000000005
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 6.68,
+              "awt_mean": 6.753333333333333,
+              "awt_mean_ci95": [
+                6.6066666666666665,
+                6.900166666666667
+              ],
               "awt_median": 7.0,
               "awt_p25": 6.0,
               "awt_p75": 7.0,
-              "awt_std": 0.7938539422542745
+              "awt_std": 0.8969498401025306,
+              "per_seed_mean": {
+                "0": 6.68,
+                "1": 6.82,
+                "2": 6.76
+              },
+              "across_seed_std": 0.0702376916856852
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 42,
+              "trips": 150,
+              "trips_with_false_alert": 126,
               "false_alert_rate": 0.84,
-              "median_first_false_alert_tick": 44.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "false_alert_rate_ci95": [
+                0.78,
+                0.8933333333333333
+              ],
+              "median_first_false_alert_tick": 49.5,
+              "per_seed_rate": {
+                "0": 0.84,
+                "1": 0.86,
+                "2": 0.82
+              },
+              "across_seed_std": 0.020000000000000018,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.8695652173913043
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.3333333333333333
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 6.72,
-            "eq1_residual_ticks": -0.040000000000000036
+            "eq1_predicted_awt_mean": 6.726666666666667,
+            "eq1_residual_ticks": 0.026666666666666394
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 6.78,
+              "awt_mean_ci95": [
+                6.64,
+                6.9335
+              ],
+              "awt_median": 7.0,
+              "awt_p25": 6.0,
+              "awt_p75": 7.0,
+              "awt_std": 0.9113011569496213,
+              "per_seed_mean": {
+                "0": 6.7,
+                "1": 6.84,
+                "2": 6.8
+              },
+              "across_seed_std": 0.0721110255092796
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 140,
+              "false_alert_rate": 0.9333333333333333,
+              "false_alert_rate_ci95": [
+                0.8933333333333333,
+                0.9666666666666667
+              ],
+              "median_first_false_alert_tick": 51.0,
+              "per_seed_rate": {
+                "0": 0.96,
+                "1": 0.96,
+                "2": 0.88
+              },
+              "across_seed_std": 0.046188021535170036,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.967391304347826
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.6111111111111112
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 6.726666666666667,
+            "eq1_residual_ticks": 0.05333333333333368
           }
         },
         "10": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 9.96,
+              "awt_mean": 10.033333333333333,
+              "awt_mean_ci95": [
+                9.8,
+                10.246666666666666
+              ],
               "awt_median": 10.0,
               "awt_p25": 10.0,
               "awt_p75": 11.0,
-              "awt_std": 1.3991250910508906
+              "awt_std": 1.3581307063975674,
+              "per_seed_mean": {
+                "0": 9.96,
+                "1": 9.86,
+                "2": 10.28
+              },
+              "across_seed_std": 0.2193931022920575
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 46,
-              "false_alert_rate": 0.92,
-              "median_first_false_alert_tick": 38.5,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 145,
+              "false_alert_rate": 0.9666666666666667,
+              "false_alert_rate_ci95": [
+                0.9333333333333333,
+                0.9933333333333333
+              ],
+              "median_first_false_alert_tick": 44.0,
+              "per_seed_rate": {
+                "0": 0.92,
+                "1": 0.98,
+                "2": 1.0
+              },
+              "across_seed_std": 0.041633319989322626,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.967391304347826
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 11.72,
-            "eq1_residual_ticks": -1.7599999999999998
+            "eq1_predicted_awt_mean": 11.726666666666667,
+            "eq1_residual_ticks": -1.6933333333333334
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 12.04,
+              "awt_mean": 12.193333333333333,
+              "awt_mean_ci95": [
+                11.946666666666667,
+                12.4735
+              ],
               "awt_median": 12.0,
               "awt_p25": 11.0,
               "awt_p75": 13.0,
-              "awt_std": 1.6654961876331056
+              "awt_std": 1.7635255516619694,
+              "per_seed_mean": {
+                "0": 12.04,
+                "1": 12.46,
+                "2": 12.08
+              },
+              "across_seed_std": 0.23180451534285024
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 39.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.96,
+                1.0
+              ],
+              "median_first_false_alert_tick": 43.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.034641016151377574,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9891304347826086
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 11.72,
-            "eq1_residual_ticks": 0.3199999999999985
+            "eq1_predicted_awt_mean": 11.726666666666667,
+            "eq1_residual_ticks": 0.4666666666666668
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 11.78,
-              "awt_median": 11.0,
+              "awt_mean": 11.953333333333333,
+              "awt_mean_ci95": [
+                11.7065,
+                12.233333333333333
+              ],
+              "awt_median": 12.0,
               "awt_p25": 11.0,
               "awt_p75": 12.0,
-              "awt_std": 1.5816550360496515
+              "awt_std": 1.6922113988342353,
+              "per_seed_mean": {
+                "0": 11.78,
+                "1": 12.1,
+                "2": 11.98
+              },
+              "across_seed_std": 0.16165807537309543
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 39.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.9533333333333334,
+                1.0
+              ],
+              "median_first_false_alert_tick": 44.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.034641016151377574,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9891304347826086
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 11.72,
-            "eq1_residual_ticks": 0.05999999999999872
+            "eq1_predicted_awt_mean": 11.726666666666667,
+            "eq1_residual_ticks": 0.22666666666666657
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 11.913333333333334,
+              "awt_mean_ci95": [
+                11.68,
+                12.193333333333333
+              ],
+              "awt_median": 12.0,
+              "awt_p25": 11.0,
+              "awt_p75": 12.0,
+              "awt_std": 1.6382043970556417,
+              "per_seed_mean": {
+                "0": 11.72,
+                "1": 12.2,
+                "2": 11.82
+              },
+              "across_seed_std": 0.253245598842967
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 150,
+              "false_alert_rate": 1.0,
+              "false_alert_rate_ci95": [
+                1.0,
+                1.0
+              ],
+              "median_first_false_alert_tick": 45.0,
+              "per_seed_rate": {
+                "0": 1.0,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.0,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 1.0
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 1.0
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 11.726666666666667,
+            "eq1_residual_ticks": 0.18666666666666742
           }
         },
         "15": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 13.9,
+              "awt_mean": 13.78,
+              "awt_mean_ci95": [
+                13.413,
+                14.1
+              ],
               "awt_median": 14.0,
               "awt_p25": 13.0,
               "awt_p75": 15.0,
-              "awt_std": 2.2519832529192065
+              "awt_std": 2.1390269380283033,
+              "per_seed_mean": {
+                "0": 13.9,
+                "1": 13.78,
+                "2": 13.66
+              },
+              "across_seed_std": 0.1200000000000001
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 46,
-              "false_alert_rate": 0.92,
-              "median_first_false_alert_tick": 34.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 145,
+              "false_alert_rate": 0.9666666666666667,
+              "false_alert_rate_ci95": [
+                0.9398333333333333,
+                0.9933333333333333
+              ],
+              "median_first_false_alert_tick": 42.0,
+              "per_seed_rate": {
+                "0": 0.92,
+                "1": 0.98,
+                "2": 1.0
+              },
+              "across_seed_std": 0.041633319989322626,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.967391304347826
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 16.72,
-            "eq1_residual_ticks": -2.8199999999999985
+            "eq1_predicted_awt_mean": 16.726666666666667,
+            "eq1_residual_ticks": -2.946666666666667
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 17.02,
+              "awt_mean": 17.18,
+              "awt_mean_ci95": [
+                16.7465,
+                17.653499999999998
+              ],
               "awt_median": 17.0,
               "awt_p25": 16.0,
-              "awt_p75": 18.0,
-              "awt_std": 2.965722543341105
+              "awt_p75": 19.0,
+              "awt_std": 2.8709842102614345,
+              "per_seed_mean": {
+                "0": 17.02,
+                "1": 17.54,
+                "2": 16.98
+              },
+              "across_seed_std": 0.31240998703626566
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 33.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.9533333333333334,
+                1.0
+              ],
+              "median_first_false_alert_tick": 40.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.034641016151377574,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9891304347826086
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 16.72,
-            "eq1_residual_ticks": 0.3000000000000007
+            "eq1_predicted_awt_mean": 16.726666666666667,
+            "eq1_residual_ticks": 0.45333333333333314
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 16.56,
-              "awt_median": 16.0,
+              "awt_mean": 16.766666666666666,
+              "awt_mean_ci95": [
+                16.386666666666667,
+                17.2
+              ],
+              "awt_median": 17.0,
               "awt_p25": 16.0,
               "awt_p75": 18.0,
-              "awt_std": 2.5407696086189384
+              "awt_std": 2.604633627037821,
+              "per_seed_mean": {
+                "0": 16.56,
+                "1": 17.16,
+                "2": 16.58
+              },
+              "across_seed_std": 0.3407834111768558
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 34.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.9533333333333334,
+                1.0
+              ],
+              "median_first_false_alert_tick": 40.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.034641016151377574,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9891304347826086
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 16.72,
-            "eq1_residual_ticks": -0.16000000000000014
+            "eq1_predicted_awt_mean": 16.726666666666667,
+            "eq1_residual_ticks": 0.03999999999999915
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 16.673333333333332,
+              "awt_mean_ci95": [
+                16.27316666666667,
+                17.093333333333334
+              ],
+              "awt_median": 17.0,
+              "awt_p25": 16.0,
+              "awt_p75": 18.0,
+              "awt_std": 2.5369660754548824,
+              "per_seed_mean": {
+                "0": 16.5,
+                "1": 17.28,
+                "2": 16.24
+              },
+              "across_seed_std": 0.5412331598611958
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 150,
+              "false_alert_rate": 1.0,
+              "false_alert_rate_ci95": [
+                1.0,
+                1.0
+              ],
+              "median_first_false_alert_tick": 40.0,
+              "per_seed_rate": {
+                "0": 1.0,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.0,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 1.0
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 1.0
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 16.726666666666667,
+            "eq1_residual_ticks": -0.053333333333334565
           }
         },
         "20": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 16.64,
+              "awt_mean": 16.786666666666665,
+              "awt_mean_ci95": [
+                16.299666666666667,
+                17.286666666666665
+              ],
               "awt_median": 17.0,
-              "awt_p25": 15.25,
+              "awt_p25": 15.0,
               "awt_p75": 18.0,
-              "awt_std": 3.173615719442711
+              "awt_std": 3.135821754510712,
+              "per_seed_mean": {
+                "0": 16.64,
+                "1": 17.22,
+                "2": 16.5
+              },
+              "across_seed_std": 0.3817503547258768
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 46,
-              "false_alert_rate": 0.92,
-              "median_first_false_alert_tick": 30.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 145,
+              "false_alert_rate": 0.9666666666666667,
+              "false_alert_rate_ci95": [
+                0.9333333333333333,
+                0.9933333333333333
+              ],
+              "median_first_false_alert_tick": 39.0,
+              "per_seed_rate": {
+                "0": 0.92,
+                "1": 0.98,
+                "2": 1.0
+              },
+              "across_seed_std": 0.041633319989322626,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.967391304347826
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 21.72,
-            "eq1_residual_ticks": -5.079999999999998
+            "eq1_predicted_awt_mean": 21.726666666666667,
+            "eq1_residual_ticks": -4.940000000000001
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 20.06,
+              "awt_mean": 20.453333333333333,
+              "awt_mean_ci95": [
+                19.786666666666665,
+                21.073666666666668
+              ],
               "awt_median": 21.0,
-              "awt_p25": 18.25,
-              "awt_p75": 22.0,
-              "awt_std": 3.883034790427903
+              "awt_p25": 19.0,
+              "awt_p75": 23.0,
+              "awt_std": 4.0526512436808915,
+              "per_seed_mean": {
+                "0": 20.06,
+                "1": 21.54,
+                "2": 19.76
+              },
+              "across_seed_std": 0.9529602999775656
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 26.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.9533333333333334,
+                1.0
+              ],
+              "median_first_false_alert_tick": 34.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.034641016151377574,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9891304347826086
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 21.72,
-            "eq1_residual_ticks": -1.6600000000000001
+            "eq1_predicted_awt_mean": 21.726666666666667,
+            "eq1_residual_ticks": -1.2733333333333334
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 19.74,
+              "awt_mean": 20.2,
+              "awt_mean_ci95": [
+                19.58,
+                20.846666666666668
+              ],
               "awt_median": 21.0,
-              "awt_p25": 18.25,
+              "awt_p25": 19.0,
               "awt_p75": 22.0,
-              "awt_std": 3.6466926586893464
+              "awt_std": 3.858225763258088,
+              "per_seed_mean": {
+                "0": 19.74,
+                "1": 21.34,
+                "2": 19.52
+              },
+              "across_seed_std": 0.9933780750550119
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 28.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.9533333333333334,
+                1.0
+              ],
+              "median_first_false_alert_tick": 34.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.034641016151377574,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9891304347826086
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
-            "eq1_predicted_awt_mean": 21.72,
-            "eq1_residual_ticks": -1.9800000000000004
+            "eq1_predicted_awt_mean": 21.726666666666667,
+            "eq1_residual_ticks": -1.5266666666666673
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 20.34,
+              "awt_mean_ci95": [
+                19.673166666666667,
+                20.986666666666668
+              ],
+              "awt_median": 21.0,
+              "awt_p25": 19.0,
+              "awt_p75": 22.0,
+              "awt_std": 4.061325204426184,
+              "per_seed_mean": {
+                "0": 20.04,
+                "1": 21.28,
+                "2": 19.7
+              },
+              "across_seed_std": 0.8316249154516727
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 150,
+              "false_alert_rate": 1.0,
+              "false_alert_rate_ci95": [
+                1.0,
+                1.0
+              ],
+              "median_first_false_alert_tick": 34.5,
+              "per_seed_rate": {
+                "0": 1.0,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.0,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 1.0
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 1.0
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 21.726666666666667,
+            "eq1_residual_ticks": -1.3866666666666667
           }
         }
       },
@@ -458,273 +1158,873 @@
         "5": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
-              "advance_warning_rate": 1.0,
-              "awt_mean": 4.46,
+              "trips": 150,
+              "trips_with_advance_warning": 149,
+              "advance_warning_rate": 0.9933333333333333,
+              "awt_mean": 4.409395973154362,
+              "awt_mean_ci95": [
+                4.275167785234899,
+                4.5369127516778525
+              ],
               "awt_median": 5.0,
               "awt_p25": 4.0,
               "awt_p75": 5.0,
-              "awt_std": 0.7615773105863908
+              "awt_std": 0.7970674529663532,
+              "per_seed_mean": {
+                "0": 4.46,
+                "1": 4.34,
+                "2": 4.34
+              },
+              "across_seed_std": 0.06928203230275515
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 4,
-              "false_alert_rate": 0.08,
-              "median_first_false_alert_tick": 48.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 11,
+              "false_alert_rate": 0.07333333333333333,
+              "false_alert_rate_ci95": [
+                0.03333333333333333,
+                0.11333333333333333
+              ],
+              "median_first_false_alert_tick": 63.0,
+              "per_seed_rate": {
+                "0": 0.08,
+                "1": 0.04,
+                "2": 0.1
+              },
+              "across_seed_std": 0.030550504633038936,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.2
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.03260869565217391
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.0
+                }
+              }
             },
             "eq1_predicted_awt_mean": 5.0,
-            "eq1_residual_ticks": -0.54
+            "eq1_residual_ticks": -0.5906040268456376
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
               "awt_mean": 5.0,
+              "awt_mean_ci95": [
+                4.906499999999999,
+                5.093333333333334
+              ],
               "awt_median": 5.0,
               "awt_p25": 5.0,
               "awt_p75": 5.0,
-              "awt_std": 0.6060915267313265
+              "awt_std": 0.6450638592808743,
+              "per_seed_mean": {
+                "0": 5.0,
+                "1": 5.0,
+                "2": 5.0
+              },
+              "across_seed_std": 0.0
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 5,
-              "false_alert_rate": 0.1,
-              "median_first_false_alert_tick": 49.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 16,
+              "false_alert_rate": 0.10666666666666667,
+              "false_alert_rate_ci95": [
+                0.06,
+                0.16
+              ],
+              "median_first_false_alert_tick": 66.5,
+              "per_seed_rate": {
+                "0": 0.1,
+                "1": 0.1,
+                "2": 0.12
+              },
+              "across_seed_std": 0.011547005383792509,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.275
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.05434782608695652
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.0
+                }
+              }
             },
             "eq1_predicted_awt_mean": 5.0,
             "eq1_residual_ticks": 0.0
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 5.0,
+              "awt_mean": 4.986666666666666,
+              "awt_mean_ci95": [
+                4.9,
+                5.073333333333333
+              ],
               "awt_median": 5.0,
               "awt_p25": 5.0,
               "awt_p75": 5.0,
-              "awt_std": 0.4948716593053935
+              "awt_std": 0.5554690462100829,
+              "per_seed_mean": {
+                "0": 5.0,
+                "1": 4.98,
+                "2": 4.98
+              },
+              "across_seed_std": 0.01154700538379227
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 5,
-              "false_alert_rate": 0.1,
-              "median_first_false_alert_tick": 49.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 22,
+              "false_alert_rate": 0.14666666666666667,
+              "false_alert_rate_ci95": [
+                0.09333333333333334,
+                0.20666666666666667
+              ],
+              "median_first_false_alert_tick": 67.0,
+              "per_seed_rate": {
+                "0": 0.1,
+                "1": 0.18,
+                "2": 0.16
+              },
+              "across_seed_std": 0.04163331998932265,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.425
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.05434782608695652
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.0
+                }
+              }
             },
             "eq1_predicted_awt_mean": 5.0,
-            "eq1_residual_ticks": 0.0
+            "eq1_residual_ticks": -0.013333333333333641
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 5.08,
+              "awt_mean_ci95": [
+                4.986666666666666,
+                5.18
+              ],
+              "awt_median": 5.0,
+              "awt_p25": 5.0,
+              "awt_p75": 5.0,
+              "awt_std": 0.6187235181777955,
+              "per_seed_mean": {
+                "0": 5.06,
+                "1": 5.08,
+                "2": 5.1
+              },
+              "across_seed_std": 0.020000000000000018
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 49,
+              "false_alert_rate": 0.32666666666666666,
+              "false_alert_rate_ci95": [
+                0.25333333333333335,
+                0.4
+              ],
+              "median_first_false_alert_tick": 59.0,
+              "per_seed_rate": {
+                "0": 0.3,
+                "1": 0.38,
+                "2": 0.3
+              },
+              "across_seed_std": 0.046188021535170064,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.75
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.20652173913043478
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.0
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 5.0,
+            "eq1_residual_ticks": 0.08000000000000007
           }
         },
         "10": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
-              "advance_warning_rate": 1.0,
-              "awt_mean": 8.32,
+              "trips": 150,
+              "trips_with_advance_warning": 149,
+              "advance_warning_rate": 0.9933333333333333,
+              "awt_mean": 8.25503355704698,
+              "awt_mean_ci95": [
+                7.986409395973154,
+                8.48993288590604
+              ],
               "awt_median": 9.0,
               "awt_p25": 8.0,
               "awt_p75": 9.0,
-              "awt_std": 1.504279609267221
+              "awt_std": 1.6072234006749426,
+              "per_seed_mean": {
+                "0": 8.32,
+                "1": 8.08,
+                "2": 8.2
+              },
+              "across_seed_std": 0.1200000000000001
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 41,
-              "false_alert_rate": 0.82,
-              "median_first_false_alert_tick": 40.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 120,
+              "false_alert_rate": 0.8,
+              "false_alert_rate_ci95": [
+                0.74,
+                0.8533333333333334
+              ],
+              "median_first_false_alert_tick": 42.0,
+              "per_seed_rate": {
+                "0": 0.82,
+                "1": 0.88,
+                "2": 0.7
+              },
+              "across_seed_std": 0.09165151389911683,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.975
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.782608695652174
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.5
+                }
+              }
             },
             "eq1_predicted_awt_mean": 10.0,
-            "eq1_residual_ticks": -1.6799999999999997
+            "eq1_residual_ticks": -1.7449664429530198
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 10.38,
+              "awt_mean": 10.426666666666666,
+              "awt_mean_ci95": [
+                10.219833333333334,
+                10.646833333333333
+              ],
               "awt_median": 10.0,
               "awt_p25": 10.0,
               "awt_p75": 11.0,
-              "awt_std": 1.2759950099064346
+              "awt_std": 1.4015651206676183,
+              "per_seed_mean": {
+                "0": 10.38,
+                "1": 10.48,
+                "2": 10.42
+              },
+              "across_seed_std": 0.05033222956847153
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 45,
-              "false_alert_rate": 0.9,
-              "median_first_false_alert_tick": 39.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 138,
+              "false_alert_rate": 0.92,
+              "false_alert_rate_ci95": [
+                0.8733333333333333,
+                0.96
+              ],
+              "median_first_false_alert_tick": 43.5,
+              "per_seed_rate": {
+                "0": 0.9,
+                "1": 0.94,
+                "2": 0.92
+              },
+              "across_seed_std": 0.019999999999999962,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9239130434782609
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.7222222222222222
+                }
+              }
             },
             "eq1_predicted_awt_mean": 10.0,
-            "eq1_residual_ticks": 0.3800000000000008
+            "eq1_residual_ticks": 0.42666666666666586
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
               "awt_mean": 10.22,
+              "awt_mean_ci95": [
+                10.033333333333333,
+                10.413333333333334
+              ],
               "awt_median": 10.0,
-              "awt_p25": 9.25,
+              "awt_p25": 9.0,
               "awt_p75": 11.0,
-              "awt_std": 1.217055664214221
+              "awt_std": 1.299819295649315,
+              "per_seed_mean": {
+                "0": 10.22,
+                "1": 10.24,
+                "2": 10.2
+              },
+              "across_seed_std": 0.020000000000000462
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 45,
-              "false_alert_rate": 0.9,
-              "median_first_false_alert_tick": 40.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 137,
+              "false_alert_rate": 0.9133333333333333,
+              "false_alert_rate_ci95": [
+                0.8665,
+                0.9533333333333334
+              ],
+              "median_first_false_alert_tick": 43.0,
+              "per_seed_rate": {
+                "0": 0.9,
+                "1": 0.92,
+                "2": 0.92
+              },
+              "across_seed_std": 0.011547005383792525,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9130434782608695
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.7222222222222222
+                }
+              }
             },
             "eq1_predicted_awt_mean": 10.0,
             "eq1_residual_ticks": 0.22000000000000064
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 10.226666666666667,
+              "awt_mean_ci95": [
+                10.013333333333334,
+                10.466833333333334
+              ],
+              "awt_median": 10.0,
+              "awt_p25": 9.0,
+              "awt_p75": 10.75,
+              "awt_std": 1.4006070911264326,
+              "per_seed_mean": {
+                "0": 10.08,
+                "1": 10.32,
+                "2": 10.28
+              },
+              "across_seed_std": 0.12858201014657267
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 147,
+              "false_alert_rate": 0.98,
+              "false_alert_rate_ci95": [
+                0.96,
+                1.0
+              ],
+              "median_first_false_alert_tick": 46.0,
+              "per_seed_rate": {
+                "0": 1.0,
+                "1": 0.98,
+                "2": 0.96
+              },
+              "across_seed_std": 0.020000000000000018,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 1.0
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8333333333333334
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 10.0,
+            "eq1_residual_ticks": 0.22666666666666657
           }
         },
         "15": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
-              "advance_warning_rate": 1.0,
-              "awt_mean": 11.54,
+              "trips": 150,
+              "trips_with_advance_warning": 149,
+              "advance_warning_rate": 0.9933333333333333,
+              "awt_mean": 11.711409395973154,
+              "awt_mean_ci95": [
+                11.38255033557047,
+                12.013422818791947
+              ],
               "awt_median": 12.0,
               "awt_p25": 11.0,
               "awt_p75": 13.0,
-              "awt_std": 2.366518151898545
+              "awt_std": 2.0869455956254126,
+              "per_seed_mean": {
+                "0": 11.54,
+                "1": 11.38,
+                "2": 11.98
+              },
+              "across_seed_std": 0.3106981386061612
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 44,
-              "false_alert_rate": 0.88,
-              "median_first_false_alert_tick": 36.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 136,
+              "false_alert_rate": 0.9066666666666666,
+              "false_alert_rate_ci95": [
+                0.86,
+                0.9533333333333334
+              ],
+              "median_first_false_alert_tick": 42.0,
+              "per_seed_rate": {
+                "0": 0.88,
+                "1": 0.9,
+                "2": 0.94
+              },
+              "across_seed_std": 0.0305505046330389,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.975
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9239130434782609
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.6666666666666666
+                }
+              }
             },
             "eq1_predicted_awt_mean": 15.0,
-            "eq1_residual_ticks": -3.460000000000001
+            "eq1_residual_ticks": -3.2885906040268456
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 15.72,
-              "awt_median": 16.0,
-              "awt_p25": 15.0,
-              "awt_p75": 16.75,
-              "awt_std": 2.3215054932310717
+              "awt_mean": 15.633333333333333,
+              "awt_mean_ci95": [
+                15.2,
+                16.0335
+              ],
+              "awt_median": 15.0,
+              "awt_p25": 14.0,
+              "awt_p75": 17.0,
+              "awt_std": 2.518166656709196,
+              "per_seed_mean": {
+                "0": 15.72,
+                "1": 16.26,
+                "2": 14.92
+              },
+              "across_seed_std": 0.6741908730718137
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 46,
-              "false_alert_rate": 0.92,
-              "median_first_false_alert_tick": 34.5,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 143,
+              "false_alert_rate": 0.9533333333333334,
+              "false_alert_rate_ci95": [
+                0.92,
+                0.98
+              ],
+              "median_first_false_alert_tick": 41.0,
+              "per_seed_rate": {
+                "0": 0.92,
+                "1": 0.94,
+                "2": 1.0
+              },
+              "across_seed_std": 0.04163331998932265,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9565217391304348
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8333333333333334
+                }
+              }
             },
             "eq1_predicted_awt_mean": 15.0,
-            "eq1_residual_ticks": 0.7200000000000006
+            "eq1_residual_ticks": 0.6333333333333329
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 15.2,
+              "awt_mean": 15.273333333333333,
+              "awt_mean_ci95": [
+                14.906666666666666,
+                15.633333333333333
+              ],
               "awt_median": 15.0,
               "awt_p25": 14.0,
               "awt_p75": 16.0,
-              "awt_std": 2.294625486315573
+              "awt_std": 2.3598904156865457,
+              "per_seed_mean": {
+                "0": 15.2,
+                "1": 15.84,
+                "2": 14.78
+              },
+              "across_seed_std": 0.5337914698956265
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 46,
-              "false_alert_rate": 0.92,
-              "median_first_false_alert_tick": 35.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 143,
+              "false_alert_rate": 0.9533333333333334,
+              "false_alert_rate_ci95": [
+                0.92,
+                0.9866666666666667
+              ],
+              "median_first_false_alert_tick": 41.0,
+              "per_seed_rate": {
+                "0": 0.92,
+                "1": 0.94,
+                "2": 1.0
+              },
+              "across_seed_std": 0.04163331998932265,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9565217391304348
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8333333333333334
+                }
+              }
             },
             "eq1_predicted_awt_mean": 15.0,
-            "eq1_residual_ticks": 0.1999999999999993
+            "eq1_residual_ticks": 0.27333333333333343
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 15.113333333333333,
+              "awt_mean_ci95": [
+                14.766666666666667,
+                15.46
+              ],
+              "awt_median": 15.0,
+              "awt_p25": 14.0,
+              "awt_p75": 16.0,
+              "awt_std": 2.2541138131811467,
+              "per_seed_mean": {
+                "0": 14.96,
+                "1": 15.68,
+                "2": 14.7
+              },
+              "across_seed_std": 0.5076744363598914
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 150,
+              "false_alert_rate": 1.0,
+              "false_alert_rate_ci95": [
+                1.0,
+                1.0
+              ],
+              "median_first_false_alert_tick": 42.0,
+              "per_seed_rate": {
+                "0": 1.0,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.0,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 1.0
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 1.0
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 15.0,
+            "eq1_residual_ticks": 0.11333333333333329
           }
         },
         "20": {
           "LSTM": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 15.24,
-              "awt_median": 16.0,
+              "awt_mean": 15.06,
+              "awt_mean_ci95": [
+                14.566333333333333,
+                15.5535
+              ],
+              "awt_median": 15.0,
               "awt_p25": 14.0,
               "awt_p75": 17.0,
-              "awt_std": 3.133492541909759
+              "awt_std": 3.0482253611485146,
+              "per_seed_mean": {
+                "0": 15.24,
+                "1": 15.0,
+                "2": 14.94
+              },
+              "across_seed_std": 0.15874507866387574
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 45,
-              "false_alert_rate": 0.9,
-              "median_first_false_alert_tick": 32.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 141,
+              "false_alert_rate": 0.94,
+              "false_alert_rate_ci95": [
+                0.8998333333333334,
+                0.9733333333333334
+              ],
+              "median_first_false_alert_tick": 40.0,
+              "per_seed_rate": {
+                "0": 0.9,
+                "1": 0.96,
+                "2": 0.96
+              },
+              "across_seed_std": 0.03464101615137751,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 0.975
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9565217391304348
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.7777777777777778
+                }
+              }
             },
             "eq1_predicted_awt_mean": 20.0,
-            "eq1_residual_ticks": -4.76
+            "eq1_residual_ticks": -4.9399999999999995
           },
           "ConstVel": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 19.38,
+              "awt_mean": 19.68,
+              "awt_mean_ci95": [
+                19.1065,
+                20.240499999999997
+              ],
               "awt_median": 20.0,
               "awt_p25": 18.0,
-              "awt_p75": 21.0,
-              "awt_std": 3.6020968949788577
+              "awt_p75": 22.0,
+              "awt_std": 3.7242539003260724,
+              "per_seed_mean": {
+                "0": 19.38,
+                "1": 20.6,
+                "2": 19.06
+              },
+              "across_seed_std": 0.8126499861564032
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 30.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 146,
+              "false_alert_rate": 0.9733333333333334,
+              "false_alert_rate_ci95": [
+                0.9466666666666667,
+                0.9933333333333333
+              ],
+              "median_first_false_alert_tick": 37.5,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 0.98,
+                "2": 1.0
+              },
+              "across_seed_std": 0.03055050463303896,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9782608695652174
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8888888888888888
+                }
+              }
             },
             "eq1_predicted_awt_mean": 20.0,
-            "eq1_residual_ticks": -0.620000000000001
+            "eq1_residual_ticks": -0.3200000000000003
           },
           "Kalman": {
             "awt": {
-              "trips": 50,
-              "trips_with_advance_warning": 50,
+              "trips": 150,
+              "trips_with_advance_warning": 150,
               "advance_warning_rate": 1.0,
-              "awt_mean": 19.18,
+              "awt_mean": 19.44,
+              "awt_mean_ci95": [
+                18.886666666666667,
+                20.013333333333332
+              ],
               "awt_median": 20.0,
               "awt_p25": 18.0,
               "awt_p75": 21.0,
-              "awt_std": 3.438616238060458
+              "awt_std": 3.584979851674588,
+              "per_seed_mean": {
+                "0": 19.18,
+                "1": 20.38,
+                "2": 18.76
+              },
+              "across_seed_std": 0.8407139822793469
             },
             "false_alert": {
-              "trips": 50,
-              "trips_with_false_alert": 47,
-              "false_alert_rate": 0.94,
-              "median_first_false_alert_tick": 30.0,
-              "d_min_km_mean": 2.912411323851236,
-              "d_min_km_min": 2.0493054470355907
+              "trips": 150,
+              "trips_with_false_alert": 145,
+              "false_alert_rate": 0.9666666666666667,
+              "false_alert_rate_ci95": [
+                0.9333333333333333,
+                0.9933333333333333
+              ],
+              "median_first_false_alert_tick": 38.0,
+              "per_seed_rate": {
+                "0": 0.94,
+                "1": 0.96,
+                "2": 1.0
+              },
+              "across_seed_std": 0.03055050463303896,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 0.9782608695652174
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 0.8333333333333334
+                }
+              }
             },
             "eq1_predicted_awt_mean": 20.0,
-            "eq1_residual_ticks": -0.8200000000000003
+            "eq1_residual_ticks": -0.5599999999999987
+          },
+          "Analytic": {
+            "awt": {
+              "trips": 150,
+              "trips_with_advance_warning": 150,
+              "advance_warning_rate": 1.0,
+              "awt_mean": 19.286666666666665,
+              "awt_mean_ci95": [
+                18.7665,
+                19.793666666666667
+              ],
+              "awt_median": 19.0,
+              "awt_p25": 18.0,
+              "awt_p75": 21.0,
+              "awt_std": 3.503280661251519,
+              "per_seed_mean": {
+                "0": 18.98,
+                "1": 20.12,
+                "2": 18.76
+              },
+              "across_seed_std": 0.7300228306932142
+            },
+            "false_alert": {
+              "trips": 150,
+              "trips_with_false_alert": 150,
+              "false_alert_rate": 1.0,
+              "false_alert_rate_ci95": [
+                1.0,
+                1.0
+              ],
+              "median_first_false_alert_tick": 38.5,
+              "per_seed_rate": {
+                "0": 1.0,
+                "1": 1.0,
+                "2": 1.0
+              },
+              "across_seed_std": 0.0,
+              "by_closest_approach_km": {
+                "0-2.5": {
+                  "n": 40,
+                  "false_alert_rate": 1.0
+                },
+                "2.5-3.5": {
+                  "n": 92,
+                  "false_alert_rate": 1.0
+                },
+                "3.5-99": {
+                  "n": 18,
+                  "false_alert_rate": 1.0
+                }
+              }
+            },
+            "eq1_predicted_awt_mean": 20.0,
+            "eq1_residual_ticks": -0.7133333333333347
           }
         }
       }
@@ -734,18 +2034,37 @@
     "ticks": 1000,
     "horizon": 15,
     "all_ticks": {
-      "mean_ms": 113.30514409963507,
-      "median_ms": 117.10869999660645,
-      "p95_ms": 122.38210000068648,
-      "p99_ms": 124.03508298564702
+      "mean_ms": 192.24491550019593,
+      "median_ms": 224.35805000714026,
+      "p95_ms": 239.49735998758115,
+      "p99_ms": 249.43544298323104
     },
     "full_alerting_step": {
       "n": 958,
-      "mean_ms": 117.48439655499485,
-      "median_ms": 117.27570000221021,
-      "p95_ms": 122.46024998894427,
-      "p99_ms": 124.04276899527758
+      "mean_ms": 199.19373392490067,
+      "median_ms": 224.61225002189167,
+      "p95_ms": 240.1064900055644,
+      "p99_ms": 249.5758489888976
     },
     "note": "single-vessel deployment path (zone predict + 1-step + H-step un-batched rollout + buffer predicate); 'full_alerting_step' excludes the first lookback ticks where only the zone classifier runs. Measure with the machine otherwise idle."
+  },
+  "latency_isolated_reruns": {
+    "note": "bench_latency run twice, alone, ~5 min after the sweep finished",
+    "runs": [
+      {
+        "n": 958,
+        "mean_ms": 214.24132390329342,
+        "median_ms": 228.28429998480715,
+        "p95_ms": 246.74972001666902,
+        "p99_ms": 254.94882297964062
+      },
+      {
+        "n": 958,
+        "mean_ms": 167.1041249478805,
+        "median_ms": 125.99439999030437,
+        "p95_ms": 246.32184999936726,
+        "p99_ms": 258.351895986998
+      }
+    ]
   }
 }

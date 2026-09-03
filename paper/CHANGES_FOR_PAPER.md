@@ -174,3 +174,119 @@ All in `paper/figures/`: `fig1_architecture.png`, `fig2_confusion.png` (paper Fi
 ## 17. Venue note (reviewer item 3)
 
 With the positioning sentence in place, target venues where a parameter/latency budget and an evaluation harness are the contribution: IEEE OCEANS, IEEE Internet of Things Journal (short paper), IEEE VTC / ICVES, or the *Journal of Marine Science and Engineering* systems track. Avoid pure-ML venues.
+
+---
+---
+
+# ROUND 2 (2026-09-03, second run) — supersedes the numbers above where they differ
+
+Three additions, all inside the same harness: (a) a fourth alerting policy, **Analytic** — zero parameters, no rollout: velocity smoothed over the last 5 deltas, closing speed against the nearest segment's Sri-Lanka-facing normal, fire when (distance − edge) ÷ closing speed ≤ H; (b) **three independent trip seeds** pooled (150 forced + 150 near-miss trips) with **1,000-resample bootstrap 95% CIs** on every mean AWT and false-alert rate, plus per-seed values; (c) **false-alert rate binned by each trip's closest approach** (<2.5 / 2.5–3.5 / ≥3.5 km; n = 40 / 92 / 18). Use these numbers instead of the Round-1 ones wherever both exist. Figures: all nine in `paper/figures/` are regenerated; Fig. 9 is new.
+
+## R2-0. Headline changes relative to Round 1
+
+- Every table gains a 95% CI column and a fourth policy row (Analytic).
+- The H = 5 → 10 false-alert cliff is now established with intervals: under the crossing predicate, FAR at H=5 is 7–15% [3–21] for the three rollouts and 80–92% [74–96] at H=10 — non-overlapping for every policy. One-tick AWT differences between ConstVel and Kalman are inside their CIs (seed-to-seed SD 0.00–0.02 ticks at H=5); the LSTM's deficit (−0.6 → −4.9 ticks) is far outside them.
+- **The false-alert problem is a closest-approach problem.** At H=5 (crossing), trips that stayed ≥3.5 km from the line produced **zero** false alerts under every policy; 2.5–3.5 km: 3–5% (rollouts); <2.5 km: 20–42%. Fig. 9.
+- **Analytic matches the rollouts on warning (eq. (1) within 0.1 tick at H=5, 15) but triples the false-alert rate** (33% [25,40] vs 11% for ConstVel at H=5, crossing): the 5-delta velocity smoothing lags the turn onto the trawl leg. The cheapest policy is not free. Recommended configuration: **last-delta constant-velocity rollout, crossing-only predicate, H = 5** — 5.00 ticks [4.91, 5.09] of warning, 11% [6, 16] false alerts overall, 0% for boats fishing ≥3.5 km out.
+- **Latency is bimodal on the reference laptop**: 117–126 ms mean when the CPU holds full clock, 214–230 ms after sustained load (four 1,000-tick runs: 117.5 / 199.2 / 214.2 / 167.1 ms mean; medians 117.3 / 224.6 / 228.3 / 126.0). Report the range and the cause; both are inside a 1 Hz budget by ≥ 4×.
+- Zone classifier, one-step error and parameter count unchanged (one-step now carries CIs: ADE 152.3 m [146.3, 158.7] LSTM, 157.7 [151.8, 164.7] ConstVel, 156.1 [150.0, 163.2] Kalman — overlapping).
+
+## R2-1. Section V — add the Analytic policy (new V-E or in VI)
+
+> **Analytic time-to-line.** As a zero-parameter reference we add a policy with no forecaster at all. At each tick it averages the last five position deltas into a velocity, projects that velocity onto the Sri-Lanka-facing unit normal of the nearest treaty segment to get a closing speed, and raises Danger when (signed distance to the line − edge) ÷ closing speed ≤ H, with edge = 2 km for the buffer predicate and 0 for the crossing predicate. It is a division and a dot product, and it runs on any chartplotter.
+
+## R2-2. Section VI — protocol
+
+Replace "Trip sets are generated once from fixed seeds" with: "Trip sets are generated from three independent seed pairs (forced 20260811/20260901/20260903; near-miss 20260812/20260902/20260904), 50 forced and 50 near-miss trips each — 150 + 150 pooled. All 150 forced trips crossed; near-miss acceptance 50/63, 50/64, 50/72. Every mean carries a 1,000-resample bootstrap 95% CI over trips; per-seed means are reported in the repository. Closest approach of the near-miss set: mean 2.87 km, range 2.05–4.28 km; 40 trips inside 2.5 km, 92 at 2.5–3.5 km, 18 at ≥ 3.5 km."
+
+## R2-3. Table III (buffer predicate, H = 15), pooled N = 150
+
+| Policy | Mean [95% CI] | Median | P25 | P75 | SD |
+|---|---|---|---|---|---|
+| LSTM | 13.78 [13.41, 14.10] | 14.0 | 13 | 15 | 2.14 |
+| ConstVel | 17.18 [16.75, 17.65] | 17.0 | 16 | 19 | 2.87 |
+| Kalman | 16.77 [16.39, 17.20] | 17.0 | 16 | 18 | 2.60 |
+| Analytic | 16.67 [16.27, 17.09] | 17.0 | 16 | 18 | 2.54 |
+| Reactive geofence | 1.73 [1.63, 1.83] | 2.0 | 1 | 2 | 0.64 |
+
+All 150/150 warned before crossing under every policy. Text: ConstVel, Kalman and Analytic are statistically indistinguishable (overlapping CIs; medians identical); the LSTM is 3–3.4 ticks behind with non-overlapping CIs.
+
+## R2-4. Table IV — eq. (1) residuals (mean AWT − predicted), ticks, pooled
+
+| Predicate | H | Predicted | LSTM | ConstVel | Kalman | Analytic |
+|---|---|---|---|---|---|---|
+| buffer | 5 | 6.73 | 6.15 (−0.58) | 6.79 (+0.06) | 6.75 (+0.03) | 6.78 (+0.05) |
+| buffer | 10 | 11.73 | 10.03 (−1.69) | 12.19 (+0.47) | 11.95 (+0.23) | 11.91 (+0.19) |
+| buffer | 15 | 16.73 | 13.78 (−2.95) | 17.18 (+0.45) | 16.77 (+0.04) | 16.67 (−0.05) |
+| buffer | 20 | 21.73 | 16.79 (−4.94) | 20.45 (−1.27) | 20.20 (−1.53) | 20.34 (−1.39) |
+| crossing | 5 | 5.00 | 4.41 (−0.59) | 5.00 (0.00) | 4.99 (−0.01) | 5.08 (+0.08) |
+| crossing | 10 | 10.00 | 8.26 (−1.74) | 10.43 (+0.43) | 10.22 (+0.22) | 10.23 (+0.23) |
+| crossing | 15 | 15.00 | 11.71 (−3.29) | 15.63 (+0.63) | 15.27 (+0.27) | 15.11 (+0.11) |
+| crossing | 20 | 20.00 | 15.06 (−4.94) | 19.68 (−0.32) | 19.44 (−0.56) | 19.29 (−0.71) |
+
+CIs on every mean are in `summary.json` (`horizon_sweep.by_predicate.<pred>.<H>.<policy>.awt.awt_mean_ci95`); half-widths are 0.05–0.15 ticks at H=5 and 0.3–0.6 at H=20. Text: the three linear policies track eq. (1) within 0.7 ticks through H=15 and within 1.5 at H=20; at H=20 all three fall slightly short because forced trips are cut five ticks after crossing and a 20-tick projection sometimes cannot fire before the trip starts. The LSTM's residual grows monotonically to −4.9 under both predicates, with seed-to-seed SD ≤ 0.4 — a property of the model instance's rollout, not sampling noise.
+
+## R2-5. Table V — unchanged values, add CI column
+
+| Model | ADE (m) [95% CI] | RMSE (m) |
+|---|---|---|
+| LSTM | 152.3 [146.3, 158.7] | 144.4 |
+| ConstVel | 157.7 [151.8, 164.7] | 146.5 |
+| Kalman | 156.1 [150.0, 163.2] | 148.7 |
+
+Text: intervals overlap; the LSTM's one-step edge is not significant at N = 1,760.
+
+## R2-6. Section VII-E — latency
+
+> End-to-end single-vessel alerting step (zone classification, one-step forecast, un-batched H = 15 rollout, Danger predicate) on the reference laptop: 117–126 ms mean when the CPU sustains full clock, 214–230 ms after ten-plus minutes of continuous load, across four 1,000-tick measurements (means 117.5, 199.2, 214.2, 167.1 ms; medians 117.3, 224.6, 228.3, 126.0 ms; p99 124–258 ms). We report the range because it is what a laptop under thermal management actually delivers; either end is inside a 1 Hz update budget by at least four times. The Analytic policy's per-tick cost is a nearest-segment lookup plus two arithmetic operations and is not separately timed.
+
+## R2-7. Table VI — false-alert rate on 150 near-miss trips, % [95% CI], per-seed in parentheses
+
+| Predicate | H | LSTM | ConstVel | Kalman | Analytic |
+|---|---|---|---|---|---|
+| buffer | 5 | 72 [65, 79] | 81 [74, 87] | 84 [78, 89] | 93 [89, 97] |
+| buffer | 10 | 97 [93, 99] | 98 [96, 100] | 98 [95, 100] | 100 |
+| buffer | 15 | 97 [94, 99] | 98 [95, 100] | 98 [95, 100] | 100 |
+| buffer | 20 | 97 [93, 99] | 98 [95, 100] | 98 [95, 100] | 100 |
+| crossing | 5 | **7 [3, 11]** (8/4/10) | **11 [6, 16]** (10/10/12) | **15 [9, 21]** (10/18/16) | 33 [25, 40] (30/38/30) |
+| crossing | 10 | 80 [74, 85] (82/88/70) | 92 [87, 96] (90/94/92) | 91 [87, 95] (90/92/92) | 98 [96, 100] |
+| crossing | 15 | 91 [86, 95] | 95 [92, 98] | 95 [92, 99] | 100 |
+| crossing | 20 | 94 [90, 97] | 97 [95, 99] | 97 [93, 99] | 100 |
+| Reactive geofence | — | 0 (by construction) | | | |
+
+AWT at the recommended point (crossing, H=5): LSTM 4.41 [4.28, 4.54]; ConstVel 5.00 [4.91, 5.09]; Kalman 4.99 [4.90, 5.07]; Analytic 5.08 [4.99, 5.18]; seed SD 0.00–0.07.
+
+## R2-8. NEW Table VII / Fig. 9 — false-alert rate by closest approach, crossing predicate
+
+| H | Policy | <2.5 km (n=40) | 2.5–3.5 km (n=92) | ≥3.5 km (n=18) |
+|---|---|---|---|---|
+| 5 | LSTM | 20% | 3% | 0% |
+| 5 | ConstVel | 28% | 5% | 0% |
+| 5 | Kalman | 42% | 5% | 0% |
+| 5 | Analytic | 75% | 21% | 0% |
+| 10 | LSTM | 98% | 78% | 50% |
+| 10 | ConstVel | 100% | 92% | 72% |
+| 10 | Kalman | 100% | 91% | 72% |
+| 10 | Analytic | 100% | 100% | 83% |
+
+Suggested text for VII-F (replaces the Round-1 draft's second paragraph onward):
+
+> Restricting Layer 2 to projected crossings changes the picture, and the three-seed pooled intervals make the change unambiguous. At H = 5 the false-alert rate is 7% [3, 11] for the LSTM, 11% [6, 16] for constant velocity and 15% [9, 21] for the Kalman rollout, for a mean advance of 4.4–5.0 ticks — 2.5–3 times the reactive geofence's 1.73 — with eq. (1) met to the second decimal by the linear rollouts. Between H = 5 and H = 10 every policy's false-alert rate jumps to 80–92% and the intervals do not touch. The usable horizon on this generator is five ticks, and Fig. 6 shows the knee with error bars.
+>
+> Where the false alerts come from is the more useful result (Table VII, Fig. 9). At H = 5 not one of the 18 trips that stayed 3.5 km or more from the line produced a false alert under any policy; trips at 2.5–3.5 km produced 3–5% under the rollouts; the rate is carried almost entirely by the 40 trips that grazed inside 2.5 km, where a straight five-tick projection from a boat already turning toward the line legitimately reaches it. A false alert on a boat fishing 2 km from an invisible international boundary is not obviously false from the skipper's seat. The operating rule this suggests is the one a fisheries department could actually issue: hold 3.5 km off and the predictive layer will not trouble you.
+>
+> The zero-parameter analytic policy earns the same warning as the rollouts (eq. (1) residual +0.08 at H = 5) but at three times their false-alert rate (33% [25, 40]), and the excess is concentrated at 2.5–3.5 km (21% against 5%). Averaging five deltas into a velocity lags the turn from the approach leg onto the trawl leg by several ticks, during which the smoothed heading still points at the line. Constant velocity on the last delta alone has no such lag. The cheapest policy is therefore not free, and the recommended configuration is the second-cheapest: last-delta constant-velocity rollout, crossing-only predicate, H = 5.
+
+## R2-9. Section VIII — replace the seed-variation caveat
+
+> **Seed variation.** Three independent trip seeds were run and pooled. Seed-to-seed standard deviation of mean AWT is 0.00–0.07 ticks at H = 5 and 0.7–1.0 at H = 20; of the false-alert rate, 1–4 percentage points at H = 5. The ConstVel–Kalman ordering flips between seeds and should be read as a tie. The LSTM's deficit and the H = 5 → 10 cliff are an order of magnitude larger than either spread.
+
+Add to "The learned forecaster is the weakest rollout": the LSTM's one advantage — the lowest false-alert rate at every H (7% vs 11–15% at H = 5) — comes from the same rollout contraction that costs it warning; it sits on the same trade-off curve as the linear policies, slightly further toward the reactive corner, not above it (Fig. 6b).
+
+## R2-10. Abstract / Conclusion — final sentence set
+
+> Pooled over three seeds (150 forced and 150 near-miss trips) with bootstrap intervals: at the recommended configuration — constant-velocity rollout, crossing-only predicate, H = 5 — the system warns 5.00 [4.91, 5.09] ticks before a crossing against 1.73 for a reactive geofence, at an 11% [6, 16] false-alert rate that falls to zero for trips staying 3.5 km off the line. A zero-parameter analytic alternative matches the warning but triples the false alerts; a 10,702-parameter delta-LSTM lowers false alerts slightly at the cost of up to 4.9 ticks of warning. Per-tick latency on a laptop is 117–230 ms depending on thermal state.
+
+## R2-11. Figures to (re)upload
+
+All nine in `paper/figures/`; new: `fig9_far_by_approach.png` (Fig. 9). Figs. 3, 6, 7 now carry error bars; Fig. 4 has five boxes (Analytic added) over 150 trips.

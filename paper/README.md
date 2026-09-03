@@ -18,6 +18,12 @@ The paper text itself is currently maintained in Claude Design (see
   - `fig6_awt_far_pareto.png` — AWT vs false-alert rate across H (the trade-off curve).
   - `fig7_far_vs_h.png` — false-alert rate vs horizon, grouped bars.
   - `fig8_near_miss_map.png` — a sample near-miss trip, to show what FAR is measured on.
+  - `fig9_far_by_approach.png` — false-alert rate by the trip's closest approach (<2.5 / 2.5–3.5 / ≥3.5 km), crossing predicate.
+
+Policies compared: LSTM, ConstVel and Kalman rollouts; a zero-parameter **Analytic** time-to-line
+policy (no rollout); and the reactive geofence. Every AWT and false-alert figure is pooled over
+three independent trip seeds (150 forced + 150 near-miss trips) with 1,000-resample bootstrap
+95% CIs; per-seed means are in `results/summary.json`.
 - `paper.md`, `paper.tex` — earlier draft (reference only).
 
 ## Regenerate everything
