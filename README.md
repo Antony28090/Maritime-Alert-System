@@ -66,18 +66,16 @@ Maritime-Alert-System/
 │   ├── train_model.py    # Model training entry point (writes train/test split)
 │   └── validation.py     # Metrics for /api/validation
 ├── results/              # summary.json, awt.csv, far_sweep.csv (from evaluate.py)
-├── paper/                # Paper sources, figure script, figures/
 ├── static/js/main.js     # Live map, HUD, and voice alerts
 ├── templates/            # index.html (map) + dashboard.html (validation)
 ├── app.py                # Flask backend + simulation thread
 └── requirements.txt      # Dependencies
 ```
 
-## 🔬 Reproducing the paper's numbers
+## 🔬 Reproducing the evaluation
 ```bash
 python -m src.train_model          # models + data/vessel_data.csv with split column
 python -m src.evaluate             # results/summary.json, awt.csv, far_sweep.csv
-python paper/generate_figures.py   # paper/figures/*.png
 ```
 
 ## 🔮 Future Enhancements

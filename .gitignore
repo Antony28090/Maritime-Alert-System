@@ -10,3 +10,7 @@ data/*
 models/*.pkl
 models/*.keras
 !data/audio/.keep
+
+# Manuscript sources and figures — kept locally, not published
+paper/
+REAL_DATA_GUIDE.md
