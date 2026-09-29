@@ -1,17 +1,81 @@
-import pandas as pd
+"""
+Layer 1 (zone classification) and Layer 2 (trajectory forecasting) models.
+
+Layer 1
+    ExactZoneClassifier  - the closed form: distance to the treaty polyline and
+                           side-of-line test (src/geometry.py).  Zero parameters,
+                           100 % accurate by definition, tens of microseconds per
+                           fix.  This is the default in app.py and evaluate.py.
+    ZoneClassifier       - the k-NN approximation of the same rule, kept as an
+                           ablation row (accuracy and latency are reported next
+                           to the exact version).
+
+Layer 2
+    TrajectoryForecaster - delta-LSTM.  variant='recursive' predicts one delta
+                           and is rolled out H times on its own output;
+                           variant='multistep' (MultiStepLSTM) emits all
+                           `horizon` deltas in one forward pass and is trained
+                           on `horizon`-step targets.  Same 50 units, same
+                           lookback, same delta scaler; only the head and the
+                           target differ.  `seed` pins the model initialisation
+                           and data shuffling so that model-seed variance can be
+                           reported.
+"""
+
+import os
+import random
+
+import joblib
 import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
+import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense
-from tensorflow.keras.models import load_model, save_model
-import joblib
-import os
-from src.config import *
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+
+from src.config import (CAUTION_DIST_KM, DANGER_DIST_KM, IMBL_POINTS, LSTM_LOOKBACK)
+from src.geometry import zone_batch, zone_of
+
+MODEL_DIR = "models"
+LSTM_UNITS = 50
+LSTM_EPOCHS = 10
+LSTM_BATCH = 32
+MULTISTEP_HORIZON = 20
+
+
+# --------------------------------------------------------------------------- #
+# Layer 1
+# --------------------------------------------------------------------------- #
+class ExactZoneClassifier:
+    """Closed-form zone rule.  No training, no state, nothing to load."""
+
+    model_type = "exact"
+
+    def __init__(self, points=IMBL_POINTS, danger_km=DANGER_DIST_KM, caution_km=CAUTION_DIST_KM):
+        self.points = points
+        self.danger_km = float(danger_km)
+        self.caution_km = float(caution_km)
+
+    def predict(self, lat, lon):
+        return zone_of(lat, lon, self.points, self.danger_km, self.caution_km)
+
+    def predict_batch(self, latlon):
+        return zone_batch(np.asarray(latlon, dtype=np.float64), self.points,
+                          self.danger_km, self.caution_km)
+
+    def train(self, data):        # interface parity with ZoneClassifier
+        return None
+
+    def save(self, path=None):
+        return None
+
+    def load(self, path=None):
+        return self
+
 
 class ZoneClassifier:
+    """k-NN (or logistic) approximation of the zone rule on (lat, lon)."""
+
     def __init__(self, model_type='knn'):
         self.model_type = model_type
         if model_type == 'knn':
@@ -21,143 +85,172 @@ class ZoneClassifier:
         self.scaler = StandardScaler()
 
     def train(self, data):
-        # Features: distance_to_imbl (could also use lat/lon but distance is more direct)
-        # Using Lat/Lon is better for "geofencing" logic if boundary is complex.
-        # But for this simulation, distance or Lat/Lon works. Let's use Lat/Lon for "realism"
         X = data[['lat', 'lon']]
         y = data['zone']
-        
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-        
         self.scaler.fit(X_train)
-        X_train_scaled = self.scaler.transform(X_train)
-        X_test_scaled = self.scaler.transform(X_test)
-        
-        self.model.fit(X_train_scaled, y_train)
-        print(f"Zone Classifier ({self.model_type}) Accuracy: {self.model.score(X_test_scaled, y_test)}")
+        self.model.fit(self.scaler.transform(X_train), y_train)
+        print(f"Zone Classifier ({self.model_type}) Accuracy: "
+              f"{self.model.score(self.scaler.transform(X_test), y_test)}")
 
     def predict(self, lat, lon):
         X_new = pd.DataFrame([[lat, lon]], columns=['lat', 'lon'])
-        X_scaled = self.scaler.transform(X_new)
-        return self.model.predict(X_scaled)[0]
-    
+        return self.model.predict(self.scaler.transform(X_new))[0]
+
+    def predict_batch(self, latlon):
+        X = pd.DataFrame(np.asarray(latlon, dtype=np.float64), columns=['lat', 'lon'])
+        return self.model.predict(self.scaler.transform(X))
+
     def save(self, path='models/zone_model.pkl'):
         joblib.dump({'model': self.model, 'scaler': self.scaler}, path)
-        
+
     def load(self, path='models/zone_model.pkl'):
         loaded = joblib.load(path)
         self.model = loaded['model']
         self.scaler = loaded['scaler']
+        return self
+
+
+# --------------------------------------------------------------------------- #
+# Layer 2
+# --------------------------------------------------------------------------- #
+def lstm_paths(variant, seed):
+    stem = os.path.join(MODEL_DIR, f"lstm_{variant}_s{int(seed)}")
+    return stem + ".keras", stem + "_scaler.pkl"
+
 
 class TrajectoryForecaster:
-    def __init__(self, lookback=LSTM_LOOKBACK):
-        self.lookback = lookback
+    """
+    Delta-LSTM trajectory forecaster.
+
+    variant 'recursive': input L scaled deltas -> 1 scaled delta (Dense(2)).
+    variant 'multistep': input L scaled deltas -> `horizon` scaled deltas
+                         (Dense(2 * horizon)), trained on horizon-step targets.
+    """
+
+    def __init__(self, lookback=LSTM_LOOKBACK, seed=0, variant="recursive",
+                 horizon=1, units=LSTM_UNITS):
+        self.lookback = int(lookback)
+        self.seed = int(seed)
+        self.variant = variant
+        self.horizon = int(horizon) if variant == "multistep" else 1
+        self.units = int(units)
         self.model = None
         self.scaler = MinMaxScaler()
-        
-    def create_sequences(self, data, lookback):
+
+    @property
+    def name(self):
+        return "LSTM-rec" if self.variant == "recursive" else "LSTM-ms"
+
+    # ----- training ------------------------------------------------------- #
+    def _sequences(self, df):
         X, y = [], []
-        # Calculate deltas for the entire sequence first
-        deltas = np.diff(data, axis=0)
-        # deltas length is len(data) - 1
-        # we need 'lookback' deltas to predict the next delta
-        for i in range(len(deltas) - lookback):
-            X.append(deltas[i:(i + lookback)])
-            y.append(deltas[i + lookback]) 
-        return np.array(X), np.array(y)
+        L, Hh = self.lookback, self.horizon
+        for _, group in df.groupby('trip_id'):
+            coords = group[['lat', 'lon']].values
+            if len(coords) < L + Hh + 1:
+                continue
+            d = self.scaler.transform(np.diff(coords, axis=0))
+            for i in range(len(d) - L - Hh + 1):
+                X.append(d[i:i + L])
+                y.append(d[i + L:i + L + Hh].reshape(-1))
+        return np.asarray(X, dtype=np.float32), np.asarray(y, dtype=np.float32)
 
-    def train(self, df):
-        sequences_X = []
-        sequences_y = []
-        
-        # Fit scaler on DELTAS first
-        coords = df[['lat', 'lon']].values
-        
-        # We need to compute all deltas across trips to fit the scaler properly
-        all_deltas = []
-        for trip_id, group in df.groupby('trip_id'):
-            trip_data = group[['lat', 'lon']].values
-            if len(trip_data) > 1:
-                all_deltas.append(np.diff(trip_data, axis=0))
-        
-        if all_deltas:
-            all_deltas_concat = np.vstack(all_deltas)
-            self.scaler.fit(all_deltas_concat)
-        
-        for trip_id, group in df.groupby('trip_id'):
-            trip_data = group[['lat', 'lon']].values
-            if len(trip_data) > self.lookback + 1:
-                # Get deltas for this trip
-                trip_deltas = np.diff(trip_data, axis=0)
-                # Scale deltas
-                trip_deltas_scaled = self.scaler.transform(trip_deltas)
-                
-                # We can reuse create_sequences on the scaled deltas
-                # but change create_sequences to not take diff again
-                # Actually, let's just build X, y here:
-                for i in range(len(trip_deltas_scaled) - self.lookback):
-                    sequences_X.append(trip_deltas_scaled[i:(i + self.lookback)])
-                    sequences_y.append(trip_deltas_scaled[i + self.lookback])
-                
-        X_train = np.array(sequences_X)
-        y_train = np.array(sequences_y)
-        
-        # Build LSTM
-        self.model = Sequential()
-        self.model.add(LSTM(50, activation='relu', input_shape=(self.lookback, 2)))
-        self.model.add(Dense(2)) # Lat delta, Lon delta
-        self.model.compile(optimizer='adam', loss='mse')
-        
-        print("Training LSTM with Deltas...")
-        self.model.fit(X_train, y_train, epochs=10, batch_size=32, verbose=1)
-        
+    def build(self):
+        import tensorflow as tf
+        from tensorflow.keras.layers import LSTM, Dense
+        from tensorflow.keras.models import Sequential
+        tf.keras.utils.set_random_seed(self.seed)      # tf, numpy and python RNGs
+        model = Sequential()
+        model.add(LSTM(self.units, activation='relu', input_shape=(self.lookback, 2)))
+        model.add(Dense(2 * self.horizon))
+        model.compile(optimizer='adam', loss='mse')
+        self.model = model
+        return model
+
+    def train(self, df, epochs=LSTM_EPOCHS, batch_size=LSTM_BATCH, verbose=0):
+        all_deltas = [np.diff(g[['lat', 'lon']].values, axis=0)
+                      for _, g in df.groupby('trip_id') if len(g) > 1]
+        self.scaler.fit(np.vstack(all_deltas))
+        X, y = self._sequences(df)
+        self.build()
+        print(f"Training {self.name} seed {self.seed}: {len(X)} sequences, "
+              f"target {self.horizon} step(s), {self.model.count_params()} params")
+        self.model.fit(X, y, epochs=epochs, batch_size=batch_size, verbose=verbose, shuffle=True)
+        return self
+
+    # ----- inference ------------------------------------------------------ #
+    def _forward(self, windows):
+        """windows (B, L+1, 2) absolute -> scaled delta outputs (B, horizon, 2)."""
+        arr = np.asarray(windows, dtype=np.float64)[:, -(self.lookback + 1):, :]
+        deltas = np.diff(arr, axis=1)
+        B = deltas.shape[0]
+        scaled = self.scaler.transform(deltas.reshape(-1, 2)) \
+                            .reshape(B, self.lookback, 2).astype(np.float32)
+        out = self.model(scaled, training=False).numpy().reshape(B, self.horizon, 2)
+        return self.scaler.inverse_transform(out.reshape(-1, 2)).reshape(B, self.horizon, 2)
+
+    def predict_next_batch(self, windows):
+        arr = np.asarray(windows, dtype=np.float64)
+        d = self._forward(arr)
+        return arr[:, -1, :] + d[:, 0, :]
+
     def predict_next(self, recent_path):
-        """
-        recent_path: list of last 'lookback' + 1 (lat, lon) absolute positions
-        so we can compute 'lookback' deltas.
-
-        Uses model.__call__ instead of model.predict to bypass tf.data pipeline
-        overhead (roughly 50x faster for single samples).
-        """
+        """Single vessel, single step (app.py path)."""
         if len(recent_path) < self.lookback + 1:
             if len(recent_path) >= 2:
                 last_delta = np.array(recent_path[-1]) - np.array(recent_path[-2])
                 return (np.array(recent_path[-1]) + last_delta).tolist()
-            return recent_path[-1]
+            return list(recent_path[-1])
+        return self.predict_next_batch(np.asarray(recent_path)[None, :, :])[0]
 
-        recent_points = np.array(recent_path[-(self.lookback + 1):], dtype=np.float32)
-        recent_deltas = np.diff(recent_points, axis=0)
+    def rollout_batch(self, hist, H):
+        """(B, L+1, 2) -> (B, H, 2) projected absolute positions."""
+        hist = np.asarray(hist, dtype=np.float64)
+        if self.variant == "multistep":
+            if H > self.horizon:
+                raise ValueError(f"multistep model emits {self.horizon} steps, asked for {H}")
+            d = self._forward(hist)[:, :H, :]
+            return hist[:, -1:, :] + np.cumsum(d, axis=1)
+        out = np.zeros((hist.shape[0], H, 2))
+        for h in range(H):
+            nxt = self.predict_next_batch(hist[:, -(self.lookback + 1):, :])
+            out[:, h, :] = nxt
+            hist = np.concatenate([hist, nxt[:, None, :]], axis=1)
+        return out
 
-        input_scaled = self.scaler.transform(recent_deltas).reshape(1, self.lookback, 2).astype(np.float32)
+    def rollout(self, recent_path, H):
+        """Single vessel rollout (app.py path): list of H [lat, lon]."""
+        return self.rollout_batch(np.asarray(recent_path)[None, -(self.lookback + 1):, :], H)[0].tolist()
 
-        pred_delta_scaled = self.model(input_scaled, training=False).numpy()[0]
-        pred_delta = self.scaler.inverse_transform([pred_delta_scaled])[0]
+    # ----- persistence ---------------------------------------------------- #
+    def save(self, path=None, stem=None):
+        mpath, spath = lstm_paths(self.variant, self.seed)
+        if stem is not None:
+            mpath, spath = stem + ".keras", stem + "_scaler.pkl"
+        elif path is not None:
+            mpath = path
+        os.makedirs(os.path.dirname(mpath) or ".", exist_ok=True)
+        self.model.save(mpath)
+        joblib.dump({"scaler": self.scaler, "lookback": self.lookback, "horizon": self.horizon,
+                     "variant": self.variant, "seed": self.seed}, spath)
 
-        last_point = recent_points[-1]
-        next_point = last_point + pred_delta
-        return next_point
+    def load(self, path=None, stem=None):
+        from tensorflow.keras.models import load_model
+        mpath, spath = lstm_paths(self.variant, self.seed)
+        if stem is not None:
+            mpath, spath = stem + ".keras", stem + "_scaler.pkl"
+        elif path is not None:
+            mpath = path
+        self.model = load_model(mpath)
+        meta = joblib.load(spath)
+        self.scaler = meta["scaler"]
+        self.lookback, self.horizon = meta["lookback"], meta["horizon"]
+        return self
 
-    def predict_next_batch(self, recent_paths):
-        """
-        Batched form of predict_next for the evaluation harness.
-        recent_paths: array-like (B, lookback+1, 2) of absolute positions.
-        Returns (B, 2) next absolute positions. Same arithmetic as predict_next,
-        one forward pass for the whole batch.
-        """
-        arr = np.asarray(recent_paths, dtype=np.float32)
-        arr = arr[:, -(self.lookback + 1):, :]
-        deltas = np.diff(arr, axis=1)                       # (B, L, 2)
-        B = deltas.shape[0]
-        scaled = self.scaler.transform(deltas.reshape(-1, 2)) \
-                            .reshape(B, self.lookback, 2).astype(np.float32)
-        pred_scaled = self.model(scaled, training=False).numpy()   # (B, 2)
-        pred_delta = self.scaler.inverse_transform(pred_scaled)
-        return arr[:, -1, :].astype(np.float64) + pred_delta
-        
-    def save(self, path='models/lstm_model.keras'):
-        self.model.save(path)
-        joblib.dump(self.scaler, 'models/lstm_scaler.pkl')
-        
-    def load(self, path='models/lstm_model.keras'):
-        self.model = load_model(path)
-        self.scaler = joblib.load('models/lstm_scaler.pkl')
+
+class MultiStepLSTM(TrajectoryForecaster):
+    """Direct multi-output variant: all `horizon` deltas in one forward pass."""
+
+    def __init__(self, lookback=LSTM_LOOKBACK, seed=0, horizon=MULTISTEP_HORIZON, units=LSTM_UNITS):
+        super().__init__(lookback=lookback, seed=seed, variant="multistep", horizon=horizon, units=units)

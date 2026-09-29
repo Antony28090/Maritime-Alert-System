@@ -1,79 +1,121 @@
-import numpy as np
-from shapely.geometry import Point, LineString
+"""
+Boundary geometry: point-to-polyline distance and side-of-line tests.
 
+Pure numpy, no per-call object construction.  The scalar functions keep the
+signatures the rest of the code base has always used; the ``*_batch``
+functions do the same maths for (N, 2) arrays of [lat, lon] fixes.
+
+Coordinates are treated as planar (lat, lon) degrees, exactly as the earlier
+shapely implementation did, and distances are converted with 111.32 km/deg.
+That is a deliberate simplification: over the 2 x 2 degree study area at 9 N
+the anisotropy is under 2 %, and it is applied identically to every policy.
+"""
+
+import numpy as np
+
+KM_PER_DEG = 111.32
+
+_SEG_CACHE = {}
+
+
+def _segments(points):
+    """Cached segment arrays for a polyline given as [[lat, lon], ...]."""
+    key = tuple(tuple(float(v) for v in p) for p in points)
+    seg = _SEG_CACHE.get(key)
+    if seg is None:
+        P = np.asarray(key, dtype=np.float64)           # (M, 2) [lat, lon]
+        A, B = P[:-1], P[1:]
+        D = B - A
+        L2 = np.sum(D * D, axis=1)
+        L2 = np.where(L2 == 0, 1.0, L2)
+        seg = (A, B, D, L2)
+        _SEG_CACHE[key] = seg
+    return seg
+
+
+def _nearest(latlon, points):
+    """(dist_deg (N,), idx (N,)) of the nearest segment for each fix."""
+    A, B, D, L2 = _segments(points)
+    X = np.asarray(latlon, dtype=np.float64).reshape(-1, 2)  # (N, 2)
+    AP = X[:, None, :] - A[None, :, :]                       # (N, S, 2)
+    t = np.clip(np.sum(AP * D[None, :, :], axis=2) / L2[None, :], 0.0, 1.0)
+    C = A[None, :, :] + t[:, :, None] * D[None, :, :]
+    d = np.sqrt(np.sum((X[:, None, :] - C) ** 2, axis=2))    # (N, S)
+    idx = np.argmin(d, axis=1)
+    return d[np.arange(len(X)), idx], idx
+
+
+def _cross(latlon, idx, points):
+    """z-component of AB x AP on segment idx, with x = lon and y = lat."""
+    A, B, D, _ = _segments(points)
+    X = np.asarray(latlon, dtype=np.float64).reshape(-1, 2)
+    a = A[idx]
+    ab_x, ab_y = D[idx, 1], D[idx, 0]              # (lon, lat) components
+    ap_x, ap_y = X[:, 1] - a[:, 1], X[:, 0] - a[:, 0]
+    return ab_x * ap_y - ab_y * ap_x
+
+
+# --------------------------------------------------------------------------- #
+# Scalar API (unchanged signatures)
+# --------------------------------------------------------------------------- #
 def distance_from_polyline(point, points):
-    """
-    Calculates minimum distance (in km) from a point [lat, lon] to a polyline.
-    Returns (distance_km, closest_segment_index)
-    """
-    min_dist = float('inf')
-    closest_seg_idx = -1
-    p = Point(point[1], point[0]) # Shapely uses (lon, lat)
-    
-    for i in range(len(points) - 1):
-        p1 = (points[i][1], points[i][0])
-        p2 = (points[i+1][1], points[i+1][0])
-        
-        line = LineString([p1, p2])
-        dist = line.distance(p) * 111.32 # Degrees to km
-        if dist < min_dist:
-            min_dist = dist
-            closest_seg_idx = i
-            
-    return min_dist, closest_seg_idx
+    """Minimum distance (km) from [lat, lon] to the polyline, and the index of
+    the closest segment.  Returns (distance_km, closest_segment_index)."""
+    d, idx = _nearest([point], points)
+    return float(d[0] * KM_PER_DEG), int(idx[0])
+
 
 def is_sri_lankan_side(point, points):
-    """
-    Determines if a point [lat, lon] is on the Sri Lankan side (East) of the IMBL.
-    Assumes IMBL_POINTS are ordered generally North to South.
-    """
-    # 1. Find closest segment
-    _, idx = distance_from_polyline(point, points)
-    if idx == -1: return False
-    
-    # 2. Check side of that segment using Cross Product
-    # Vector AB: Segment
-    # Vector AP: Point relative to Start
-    
-    A = points[idx]
-    B = points[idx+1]
-    P = point
-    
-    # Coordinates: [Lat, Lon] -> [y, x]
-    # Cross Product (2D) = (Bx - Ax)*(Py - Ay) - (By - Ay)*(Px - Ax)
-    # x is Lon, y is Lat
-    
-    ax, ay = A[1], A[0]
-    bx, by = B[1], B[0]
-    px, py = P[1], P[0]
-    
-    # Vector AB
-    ab_x = bx - ax
-    ab_y = by - ay
-    
-    # Vector AP
-    ap_x = px - ax
-    ap_y = py - ay
-    
-    # Cross product z-component
-    cross_product = (ab_x * ap_y) - (ab_y * ap_x)
-    
-    # Interpretation:
-    # If line is North -> South (Lat decreasing):
-    # Vector AB points "Down".
-    # Sri Lanka (East) is to the "Left" of the vector?
-    # Let's visualize: 
-    # A=(10, 80), B=(9, 79). AB vector = (-1 lon, -1 lat).
-    # Point P=(9.5, 80) [East, SL]. AP vector = (0 lon, -0.5 lat).
-    # Wait. A=(Lat 10, Lon 80), B=(Lat 9, Lon 79).
-    # A=[80, 10], B=[79, 9].
-    # AB = [-1, -1].
-    # P=[80.5, 9.5]. AP = [0.5, -0.5].
-    # CP = (-1 * -0.5) - (-1 * 0.5) = 0.5 - (-0.5) = 1.0. Positive.
-    # Point Q=[78.5, 9.5] [West, India]. AQ = [-1.5, -0.5].
-    # CP = (-1 * -0.5) - (-1 * -1.5) = 0.5 - 1.5 = -1.0. Negative.
-    
-    # So Positive Cross Product means "Left" relative to AB (which is East here).
-    # Therefore, if CP > 0, it is Sri Lankan side.
-    
-    return cross_product > 0
+    """True if [lat, lon] lies on the far (Sri Lankan / forbidden) side of the
+    polyline, i.e. to the left of the nearest segment's direction of travel."""
+    _, idx = _nearest([point], points)
+    return bool(_cross([point], idx, points)[0] > 0)
+
+
+# --------------------------------------------------------------------------- #
+# Batched API
+# --------------------------------------------------------------------------- #
+def distance_batch(latlon, points):
+    """(dist_km (N,), idx (N,)) for an (N, 2) array of [lat, lon]."""
+    d, idx = _nearest(latlon, points)
+    return d * KM_PER_DEG, idx
+
+
+def side_batch(latlon, points):
+    """Boolean (N,): True where the fix is on the far side of the polyline."""
+    _, idx = _nearest(latlon, points)
+    return _cross(latlon, idx, points) > 0
+
+
+def flags_batch(latlon, points, danger_km):
+    """(far_side (N,), inside_buffer (N,), dist_km (N,), seg_idx (N,))."""
+    d, idx = _nearest(latlon, points)
+    far = _cross(latlon, idx, points) > 0
+    d_km = d * KM_PER_DEG
+    return far, d_km < danger_km, d_km, idx
+
+
+def segment_normals(points):
+    """(S, 2) unit normals of each segment in (lon, lat) components, pointing
+    to the far side (the side where the cross product above is positive)."""
+    A, B, D, _ = _segments(points)
+    dx, dy = D[:, 1], D[:, 0]
+    n = np.stack([-dy, dx], axis=1)
+    return n / np.linalg.norm(n, axis=1, keepdims=True)
+
+
+def zone_of(lat, lon, points, danger_km, caution_km):
+    """Exact zone label for one fix: DANGER on the far side or inside the
+    danger buffer, CAUTION inside the caution band, otherwise SAFE."""
+    far, buf, d, _ = flags_batch([[lat, lon]], points, danger_km)
+    if far[0] or buf[0]:
+        return "DANGER"
+    if d[0] < caution_km:
+        return "CAUTION"
+    return "SAFE"
+
+
+def zone_batch(latlon, points, danger_km, caution_km):
+    far, buf, d, _ = flags_batch(latlon, points, danger_km)
+    out = np.where(far | buf, "DANGER", np.where(d < caution_km, "CAUTION", "SAFE"))
+    return out.astype(object)

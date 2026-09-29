@@ -48,12 +48,40 @@ def get_zone(dist_km):
         return "SAFE"
 
 
-# Near-miss trips loiter this far (km) on the Indian side of the line: inside
-# the 5 km CAUTION band, outside the 2 km DANGER buffer, with margin for the
-# steering controller's corner-cutting. Tune NEAR_MISS_OFFSET_KM if acceptance
-# in generate_near_miss_trajectory() drops.
-NEAR_MISS_OFFSET_KM = (3.5, 4.8)
+# Near-miss trips loiter this far (km) on the Indian side of the line.  The
+# standoff is sampled LOG-UNIFORMLY over the range so the 2-4 km decade is not
+# starved: the false-alert experiment must test the "hold 3.5 km off" rule on
+# trips that were never designed around it.  Trips that stray into the 2 km
+# DANGER buffer are rejected by generate_near_miss_trajectory(); the standoff
+# is drawn once per trip and re-used across retries so rejection does not
+# reshape the standoff distribution.
+NEAR_MISS_OFFSET_KM = (2.2, 12.0)
 NEAR_MISS_LOITER_DEG = (0.08, 0.15)   # length of the along-boundary trawl leg
+
+# Default step lengths (deg/tick) when the caller does not pin one.  These are
+# the legacy values: forced trips ran faster than the rest.  The evaluation
+# harness always passes base_speed explicitly so every mode in a sweep
+# configuration shares one step length.
+DEFAULT_SPEED = {"normal": 0.008, "forced": 0.012, "near_miss": 0.008}
+SPEED_PROFILES = [0.008, 0.012, 0.018]
+
+MOTION_PROFILES = ("smooth", "trawl")
+# 'trawl' motion parameters (all per tick):
+TRAWL = {
+    "pause_p": 0.02,            # probability of starting an on-station pause
+    "pause_len": (5, 15),       # pause duration, ticks (uniform integer)
+    "pause_factor": 0.1,        # speed multiplier while paused
+    "p_track_to_circle": 0.03,  # heading regime: bearing-tracking -> slow circling
+    "p_circle_to_track": 0.10,  # heading regime: circling -> bearing-tracking
+    "circle_rate": 0.05,        # rad/tick constant turn while circling (sign random)
+    "jump_p": 0.01,             # probability of an abrupt heading change
+    "jump_mag": (0.5, 1.0),     # magnitude of the abrupt change, rad (sign random)
+}
+
+
+def sample_near_miss_offset_km(rng=random):
+    lo, hi = NEAR_MISS_OFFSET_KM
+    return float(np.exp(rng.uniform(np.log(lo), np.log(hi))))
 
 
 def _land_avoid_waypoints(start_lat, start_lon, target_lat):
@@ -70,9 +98,22 @@ def _land_avoid_waypoints(start_lat, start_lon, target_lat):
     return wps
 
 
-def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
+def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None,
+                        base_speed=None, motion_profile="smooth",
+                        near_miss_offset_km=None):
     """
     Generates a realistic vessel path with drift, steering noise, and sensor noise.
+
+    base_speed      - mean step length in deg/tick.  None -> DEFAULT_SPEED[mode].
+    motion_profile  - 'smooth': waypoint tracking with steering wiggle only.
+                      'trawl' : adds on-station pauses (speed x 0.1 for 5-15
+                                ticks, p = 0.02/tick), a two-state Markov heading
+                                regime that alternates bearing-tracking with a
+                                slow constant-rate circling turn (+-0.05 rad/tick),
+                                and abrupt heading changes of 0.5-1.0 rad
+                                (p = 0.01/tick).  See TRAWL.
+    near_miss_offset_km - standoff of the near-miss loiter point from the line;
+                      None -> log-uniform draw over NEAR_MISS_OFFSET_KM.
 
     mode:
       'normal'    - head to a destination near the boundary (seeded from real AIS
@@ -89,6 +130,11 @@ def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
         mode = 'forced' if force_crossing else 'normal'
     force_crossing = (mode == 'forced')
     near_miss = (mode == 'near_miss')
+    if motion_profile not in MOTION_PROFILES:
+        raise ValueError(f"motion_profile must be one of {MOTION_PROFILES}")
+    trawl = (motion_profile == 'trawl')
+    if base_speed is None:
+        base_speed = DEFAULT_SPEED[mode]
 
     if not REAL_DATA_POINTS:
         load_real_seed_data()
@@ -151,7 +197,9 @@ def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
         # Loiter point on the INDIAN side, inside the caution band
         if perp_is_sl:
             perp_lon, perp_lat = -perp_lon, -perp_lat
-        offset_deg = random.uniform(*NEAR_MISS_OFFSET_KM) / 111.32
+        if near_miss_offset_km is None:
+            near_miss_offset_km = sample_near_miss_offset_km()
+        offset_deg = near_miss_offset_km / 111.32
         target_lat = imbl_target_lat + (perp_lat * offset_deg)
         target_lon = imbl_target_lon + (perp_lon * offset_deg)
 
@@ -213,10 +261,12 @@ def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
 
     current_heading = target_heading
 
-    # Speed setup
-    base_speed = 0.008
-    if force_crossing:
-        base_speed = 0.012 # Move faster for testing
+    # Speed setup: base_speed is fixed above (explicit argument or DEFAULT_SPEED)
+
+    # 'trawl' motion state
+    pause_left = 0
+    regime = 'track'          # 'track' (bearing-tracking) or 'circle'
+    circle_sign = 1.0
 
     # Environmental Drift (Currents/Wind) - Constant for the trip
     drift_lat = np.random.normal(0, 0.0002)
@@ -250,8 +300,20 @@ def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
         # Normalize diff_angle to [-pi, pi] to take shortest turn
         diff_angle = (diff_angle + np.pi) % (2 * np.pi) - np.pi
 
-        current_heading = current_heading + steer_factor * diff_angle
+        if trawl:
+            # (b) two-state Markov heading regime
+            if regime == 'track' and random.random() < TRAWL["p_track_to_circle"]:
+                regime, circle_sign = 'circle', random.choice([-1.0, 1.0])
+            elif regime == 'circle' and random.random() < TRAWL["p_circle_to_track"]:
+                regime = 'track'
+        if regime == 'track':
+            current_heading = current_heading + steer_factor * diff_angle
+        else:
+            current_heading = current_heading + circle_sign * TRAWL["circle_rate"]
         current_heading += np.random.normal(0, 0.03) # Random steering wiggle (radians)
+        if trawl and random.random() < TRAWL["jump_p"]:
+            # (c) abrupt heading change
+            current_heading += random.choice([-1.0, 1.0]) * random.uniform(*TRAWL["jump_mag"])
 
         # B. Update Speed
         # If reached final waypoint completely, slow down to drift speed
@@ -259,6 +321,13 @@ def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
             step_speed = base_speed * 0.1 * np.random.normal(1.0, 0.2)
         else:
             step_speed = base_speed * np.random.normal(1.0, 0.1)
+        if trawl:
+            # (a) on-station pauses
+            if pause_left == 0 and random.random() < TRAWL["pause_p"]:
+                pause_left = random.randint(*TRAWL["pause_len"])
+            if pause_left > 0:
+                step_speed *= TRAWL["pause_factor"]
+                pause_left -= 1
 
         # C. Update Position (Physics)
         # Move in direction of heading
@@ -297,21 +366,29 @@ def generate_trajectory(trip_id, n_points=100, force_crossing=False, mode=None):
     return data
 
 
-def generate_near_miss_trajectory(trip_id, n_points=220, max_tries=30):
+def generate_near_miss_trajectory(trip_id, n_points=220, max_tries=60, base_speed=None,
+                                  motion_profile="smooth", offset_km=None):
     """
-    A non-crossing trip that approaches the boundary, trawls along it inside the
-    CAUTION band, and returns to port.  Enforces the invariant that no fix is in
-    the DANGER zone (neither on the Sri Lankan side nor inside the 2 km buffer);
-    a trip that violates it is discarded and regenerated.
+    A non-crossing trip that approaches the boundary, trawls along it at a
+    standoff drawn log-uniformly from NEAR_MISS_OFFSET_KM, and returns to port.
+    Enforces the invariant that no fix is in the DANGER zone (neither on the
+    Sri Lankan side nor inside the 2 km buffer); a trip that violates it is
+    discarded and regenerated WITH THE SAME STANDOFF, so rejection changes only
+    the realisation, not the standoff distribution.
 
     Returns (trajectory, tries) or (None, tries) if max_tries is exhausted.
     """
+    if offset_km is None:
+        offset_km = sample_near_miss_offset_km()
     for attempt in range(1, max_tries + 1):
         traj = generate_trajectory(trip_id=trip_id * 100 + attempt,
-                                   n_points=n_points, mode='near_miss')
+                                   n_points=n_points, mode='near_miss',
+                                   base_speed=base_speed, motion_profile=motion_profile,
+                                   near_miss_offset_km=offset_km)
         if all(step['zone'] != 'DANGER' for step in traj):
             for step in traj:
                 step['trip_id'] = trip_id
+                step['standoff_km'] = offset_km
             return traj, attempt
     return None, max_tries
 

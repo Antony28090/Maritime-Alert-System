@@ -17,7 +17,7 @@ def get_validation_metrics():
     try:
         zone_model = ZoneClassifier()
         zone_model.load()
-        lstm_model = TrajectoryForecaster()
+        lstm_model = TrajectoryForecaster(seed=0)   # recursive delta-LSTM, model seed 0
         lstm_model.load()
     except Exception as e:
          return {"error": f"Models not found or failed to load: {str(e)}"}
@@ -108,28 +108,11 @@ def get_validation_metrics():
             # Let's just do a few points per trip or the whole trip if small.
             # For MSE, we want many points.
             
-            # Create sequences
-            X_seq, y_next_true_delta = lstm_model.create_sequences(coords, LSTM_LOOKBACK)
-            
-            if len(X_seq) == 0:
-                continue
+            # One (L+1)-point window per fix whose successor exists; batched one-step forecast
+            W = np.stack([coords[i - LSTM_LOOKBACK: i + 1] for i in range(LSTM_LOOKBACK, len(coords) - 1)])
+            pred_points = lstm_model.predict_next_batch(W)
+            actual_points = coords[LSTM_LOOKBACK + 1:]
 
-            # Manually scale for batch prediction
-            N, L, F = X_seq.shape
-            X_seq_flat = X_seq.reshape(N*L, F)
-            X_seq_scaled = lstm_model.scaler.transform(X_seq_flat).reshape(N, L, F)
-            
-            # Predict
-            pred_scaled = lstm_model.model.predict(X_seq_scaled, verbose=0)
-            pred_unscaled_delta = lstm_model.scaler.inverse_transform(pred_scaled)
-            
-            # Convert deltas back to absolute positions
-            # The base point for the delta is coords[i + LSTM_LOOKBACK]
-            last_points = coords[LSTM_LOOKBACK:-1] # shape (N, 2)
-            
-            actual_points = last_points + y_next_true_delta
-            pred_points = last_points + pred_unscaled_delta
-            
             y_lstm_true.extend(actual_points)
             y_lstm_pred.extend(pred_points)
             

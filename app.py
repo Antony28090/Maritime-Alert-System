@@ -2,7 +2,7 @@ import threading
 import time
 import random
 from flask import Flask, render_template, jsonify
-from src.models import ZoneClassifier, TrajectoryForecaster
+from src.models import ExactZoneClassifier, TrajectoryForecaster
 from src.alert_system import AlertSystem
 from src.data_generator import generate_trajectory
 from src.geometry import distance_from_polyline, is_sri_lankan_side
@@ -38,9 +38,8 @@ class SimulationThread(threading.Thread):
         print("Starting Simulation Thread...")
         # Load Models inside thread (or global, but simpler here for now)
         try:
-            zone_model = ZoneClassifier()
-            zone_model.load()
-            lstm_model = TrajectoryForecaster()
+            zone_model = ExactZoneClassifier()        # Layer 1: the closed-form rule
+            lstm_model = TrajectoryForecaster(seed=0) # Layer 2: recursive delta-LSTM, model seed 0
             lstm_model.load()
             alert_sys = AlertSystem()
         except Exception as e:
@@ -116,17 +115,8 @@ class SimulationThread(threading.Thread):
                     actual_history.append([lat, lon])
                     pred_1step_history.append(nxt_1_step_list)
                     
-                    # Predict multiple steps recursively to form a trajectory line (for the map forecast line)
-                    pred_path = []
-                    curr_seq = recent_path.copy()
-                    
-                    # Project FORECAST_HORIZON steps into the future (same H as src/evaluate.py)
-                    for _ in range(FORECAST_HORIZON):
-                        nxt = lstm_model.predict_next(curr_seq[-(LSTM_LOOKBACK + 1):])
-                        nxt_list = nxt.tolist() if hasattr(nxt, 'tolist') else nxt
-                        pred_path.append(nxt_list)
-                        curr_seq.append(nxt_list)
-                        
+                    # Recursive FORECAST_HORIZON-step projection (same H as src/evaluate.py)
+                    pred_path = lstm_model.rollout(recent_path, FORECAST_HORIZON)
                     prediction_path = pred_path
                     
                     # Check if any future point hits Danger or crosses

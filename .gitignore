@@ -11,6 +11,10 @@ models/*.pkl
 models/*.keras
 !data/audio/.keep
 
-# Manuscript sources and figures — kept locally, not published
+# Research-paper sources, figures and paper-only outputs — kept locally, not published
 paper/
+results/rho_fit.json
 REAL_DATA_GUIDE.md
+
+models/real/
+data/real_ais/

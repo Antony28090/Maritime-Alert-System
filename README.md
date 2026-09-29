@@ -8,74 +8,64 @@
 ![Status](https://img.shields.io/badge/Status-Completed-success)
 
 ## 📌 Overview
-This project addresses the critical issue of fishermen unknowingly crossing International Maritime Boundary Lines (IMBL). It uses a **Two-Layer Hybrid Architecture** to provide real-time, proactive warnings.
-
-Instead of just alerting *after* a crossing (Reactive), this system forecasts the vessel's trajectory and warns *before* a violation occurs (Proactive).
+This project addresses the problem of fishermen unknowingly crossing International Maritime Boundary Lines (IMBL). It uses a **two-layer architecture** to give a proactive warning *before* a crossing instead of a reactive one after it, and — this is the research contribution — an **evaluation protocol** that measures what such a system delivers: advance warning time (AWT) against false-alert rate (FAR), as a function of the projection horizon, the vessel's step length and its standoff from the line.
 
 ## 🚀 Key Features
-*   **Layer 1: Zone Classification**: Uses **KNN** to instantly classify the vessel's location into **Safe**, **Caution**, or **Danger** zones.
-*   **Layer 2: Trajectory Forecasting**: Uses **LSTM (Deep Learning)** to predict the vessel's future path and estimate "Time to Intercept" the boundary.
-*   **🗣️ Tamil Voice Alerts**: Integrated Text-to-Speech (TTS) provides clear audio warnings in the local language (*"Echarikkai!"*).
-*   **🗺️ Real-time Dashboard**: A web-based interface (Leaflet.js) visualizing the vessel, boundary line, and predictive path.
+*   **Layer 1: Exact zone rule**: distance to the treaty polyline and side-of-line test, closed form, ~30 µs per fix (`ExactZoneClassifier`). The earlier k-NN classifier is kept as an ablation.
+*   **Layer 2: H-step projection**: constant-velocity, Kalman, recursive delta-LSTM, direct multi-step LSTM, or a zero-parameter analytic time-to-line; fires on projected crossings (crossing predicate) or on projected buffer entry (buffer predicate).
+*   **Evaluation protocol**: forced-crossing and near-miss trips across three step lengths and two motion profiles (smooth / trawl), H = 1–20, three trip seeds, five model seeds; eq. (1) residuals, the dimensionless false-alert cliff in ρ = H·s̄/d_min, and rollout contraction measured directly.
+*   **Real motion**: the same protocol on NOAA MarineCadastre AIS fishing-vessel tracks (CC0) against arbitrary straight boundaries (`src/real_ais.py`).
+*   **🗣️ Tamil voice alerts** and a **Leaflet dashboard** for the live demo.
 
 ## 🛠️ Tech Stack
-*   **Language**: Python
-*   **Web Framework**: Flask
-*   **Frontend**: HTML5, CSS3, JavaScript, Leaflet.js
-*   **Machine Learning**: TensorFlow (Keras), Scikit-Learn, NumPy, Pandas
-*   **Audio**: gTTS (Google Text-to-Speech)
+Python 3.13, Flask, Leaflet.js, TensorFlow/Keras, scikit-learn, NumPy, pandas, pyarrow, gTTS.
 
 ## ⚙️ Installation
-
-1.  **Clone the Repository**
-    ```bash
-    git clone https://github.com/Antony28090/Maritime-Alert-System.git
-    cd Maritime-Alert-System
-    ```
-
-2.  **Install Dependencies**
-    ```bash
-    pip install -r requirements.txt
-    ```
-
-3.  **Train the Models** (First time only)
-    ```bash
-    python -m src.train_model
-    ```
-
-4.  **Run the Dashboard**
-    ```bash
-    python app.py
-    ```
-
-5.  **Access the Interface**
-    Open your browser and navigate to: `http://127.0.0.1:5000`
-
-## 📂 Project Structure
-```
-Maritime-Alert-System/
-├── src/
-│   ├── alert_system.py   # Server-side audio alerts (gTTS + pygame)
-│   ├── baselines.py      # Constant-velocity, Kalman and reactive-geofence policies
-│   ├── config.py         # IMBL points, zone thresholds, FORECAST_HORIZON
-│   ├── data_generator.py # Synthetic trips: normal / forced-crossing / near-miss
-│   ├── evaluate.py       # Paper harness: AWT + false-alert sweep over H, latency
-│   ├── geometry.py       # Polyline distance & side-of-line helpers
-│   ├── models.py         # KNN Zone Classifier + LSTM Trajectory Forecaster
-│   ├── process_data.py   # Filter raw AIS CSVs into data/Processed/
-│   ├── train_model.py    # Model training entry point (writes train/test split)
-│   └── validation.py     # Metrics for /api/validation
-├── results/              # summary.json, awt.csv, far_sweep.csv (from evaluate.py)
-├── static/js/main.js     # Live map, HUD, and voice alerts
-├── templates/            # index.html (map) + dashboard.html (validation)
-├── app.py                # Flask backend + simulation thread
-└── requirements.txt      # Dependencies
+```bash
+git clone https://github.com/Antony28090/Maritime-Alert-System.git
+cd Maritime-Alert-System
+pip install -r requirements.txt
 ```
 
 ## 🔬 Reproducing the evaluation
+From the repository root, in order:
 ```bash
-python -m src.train_model          # models + data/vessel_data.csv with split column
-python -m src.evaluate             # results/summary.json, awt.csv, far_sweep.csv
+python -m src.train_model          # k-NN ablation + 5 seeds x {recursive, multistep} delta-LSTMs; data/vessel_data.csv
+python -m src.evaluate             # results/summary.json, awt.csv, far_sweep.csv, far_vs_rho.csv.gz, rollout_contraction.csv
+```
+Both `train_model` and `evaluate` accept `--quick` for a smoke test. The full sweep takes about 20 minutes on a laptop CPU.
+
+### Real AIS trajectories
+```bash
+python -m src.ais_download --start 2024-07-01 --end 2024-07-31   # ~9 GB, NOAA MarineCadastre 2024 GeoParquet, CC0
+python -m src.real_ais filter                                     # fishing vessels (type 30) in the study regions
+python -m src.real_ais run                                        # results/real_ais/<region>_<cadence>s/
+```
+Data source and licence: NOAA Office for Coastal Management / BOEM, *Nationwide Automatic Identification System 2024* (Martin, Brass, Dornback & Fontenault, 2025), licensed CC0 1.0 Universal; acknowledgement U.S. Coast Guard Navigation Center. Raw files are not committed.
+
+## 🖥️ Running the dashboard
+```bash
+python app.py        # http://127.0.0.1:5000
+```
+
+## 📂 Project Structure
+```
+├── src/
+│   ├── geometry.py       # vectorised point-to-polyline distance and side test (exact Layer 1)
+│   ├── config.py         # IMBL points, zone thresholds, FORECAST_HORIZON
+│   ├── data_generator.py # synthetic trips: normal / forced / near-miss; speed and motion profiles
+│   ├── models.py         # ExactZoneClassifier, k-NN ablation, recursive and multi-step delta-LSTMs
+│   ├── baselines.py      # batched constant-velocity and Kalman rollouts, reactive geofence
+│   ├── train_model.py    # training entry point (5 model seeds x 2 LSTM variants)
+│   ├── evaluate.py       # the protocol: AWT / FAR sweep, rho, contraction, latency
+│   ├── ais_download.py   # parallel downloader for NOAA MarineCadastre daily files
+│   ├── real_ais.py       # the protocol on real AIS motion against arbitrary lines
+│   ├── alert_system.py   # server-side audio alerts (gTTS + pygame)
+│   └── validation.py     # metrics for /api/validation
+├── results/              # evaluation outputs (regenerated by evaluate.py / real_ais.py)
+├── static/, templates/   # live map and validation dashboard
+├── app.py                # Flask backend + simulation thread
+└── requirements.txt
 ```
 
 ## 🔮 Future Enhancements
