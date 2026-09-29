@@ -1,0 +1,126 @@
+{
+ "region": "gulf",
+ "region_name": "Gulf of Mexico shelf (TX-LA-MS-AL)",
+ "cadence_s": 300,
+ "fixes": 4676086,
+ "vessels": 443,
+ "trips_total": 3409,
+ "train_trips": 400,
+ "test_trips": 500,
+ "test_vessels": 133,
+ "test_s_bar_km": {
+  "median": 0.46224782761442046,
+  "p25": 0.31975437858764566,
+  "p75": 0.5784079158151442
+ },
+ "test_trip_ticks": {
+  "median": 151.0
+ },
+ "n_lines": 12,
+ "lines": [
+  {
+   "anchor_lat": 27.933585882352943,
+   "anchor_lon": -96.67487974789917,
+   "theta_rad": 5.00215117350314,
+   "n_forced": 5,
+   "n_near": 10
+  },
+  {
+   "anchor_lat": 27.1958425,
+   "anchor_lon": -97.20391125,
+   "theta_rad": 2.0500861741750884,
+   "n_forced": 11,
+   "n_near": 14
+  },
+  {
+   "anchor_lat": 27.21635636363636,
+   "anchor_lon": -97.171805,
+   "theta_rad": 3.9630081038670246,
+   "n_forced": 15,
+   "n_near": 35
+  },
+  {
+   "anchor_lat": 28.56434853932584,
+   "anchor_lon": -95.82095168539325,
+   "theta_rad": 1.3426897442881278,
+   "n_forced": 8,
+   "n_near": 12
+  },
+  {
+   "anchor_lat": 28.366954347826088,
+   "anchor_lon": -95.99479260869566,
+   "theta_rad": 2.1506453702506114,
+   "n_forced": 5,
+   "n_near": 12
+  },
+  {
+   "anchor_lat": 29.380124333333335,
+   "anchor_lon": -94.77337566666667,
+   "theta_rad": 1.7258533796323452,
+   "n_forced": 16,
+   "n_near": 12
+  },
+  {
+   "anchor_lat": 27.151130000000002,
+   "anchor_lon": -97.12551571428571,
+   "theta_rad": 3.0421563877055218,
+   "n_forced": 11,
+   "n_near": 5
+  },
+  {
+   "anchor_lat": 29.5007,
+   "anchor_lon": -93.49551,
+   "theta_rad": 3.8797054626166085,
+   "n_forced": 22,
+   "n_near": 29
+  },
+  {
+   "anchor_lat": 28.89577612903226,
+   "anchor_lon": -92.59071274193548,
+   "theta_rad": 3.5473323733120194,
+   "n_forced": 20,
+   "n_near": 58
+  },
+  {
+   "anchor_lat": 29.86602,
+   "anchor_lon": -93.934136,
+   "theta_rad": 4.27506032256269,
+   "n_forced": 8,
+   "n_near": 11
+  },
+  {
+   "anchor_lat": 29.56609611111111,
+   "anchor_lon": -92.64917222222222,
+   "theta_rad": 2.4739409965722303,
+   "n_forced": 10,
+   "n_near": 43
+  },
+  {
+   "anchor_lat": 29.308106043956045,
+   "anchor_lon": -91.66071483516484,
+   "theta_rad": 3.4418084852034947,
+   "n_forced": 31,
+   "n_near": 48
+  }
+ ],
+ "model_seeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ],
+ "trainable_params": {
+  "LSTM-rec": 10702,
+  "LSTM-ms": 12640
+ },
+ "filters": {
+  "vessel_type": 30,
+  "p95_sog_kn_max": 10.0,
+  "gap_split_s": 1800,
+  "gap_interp_s": 600,
+  "min_ticks": 60,
+  "max_ticks": 720,
+  "d_near_max_km": 30.0
+ }
+}

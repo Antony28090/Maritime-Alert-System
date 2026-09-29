@@ -1,0 +1,126 @@
+{
+ "region": "pnw",
+ "region_name": "Pacific Northwest (CA-OR-WA)",
+ "cadence_s": 120,
+ "fixes": 4360058,
+ "vessels": 381,
+ "trips_total": 3314,
+ "train_trips": 400,
+ "test_trips": 500,
+ "test_vessels": 114,
+ "test_s_bar_km": {
+  "median": 0.20285827208579016,
+  "p25": 0.1262419082635361,
+  "p75": 0.35679215975744094
+ },
+ "test_trip_ticks": {
+  "median": 332.5
+ },
+ "n_lines": 12,
+ "lines": [
+  {
+   "anchor_lat": 41.82340774647887,
+   "anchor_lon": -124.50684309859155,
+   "theta_rad": 0.9648388282100278,
+   "n_forced": 7,
+   "n_near": 19
+  },
+  {
+   "anchor_lat": 46.23397941176471,
+   "anchor_lon": -123.98082411764706,
+   "theta_rad": 5.726450622363629,
+   "n_forced": 57,
+   "n_near": 6
+  },
+  {
+   "anchor_lat": 46.92433103448276,
+   "anchor_lon": -124.42439,
+   "theta_rad": 2.374380116382035,
+   "n_forced": 22,
+   "n_near": 49
+  },
+  {
+   "anchor_lat": 45.702634114832534,
+   "anchor_lon": -124.48911406698565,
+   "theta_rad": 2.0450522527721158,
+   "n_forced": 44,
+   "n_near": 102
+  },
+  {
+   "anchor_lat": 46.78674313333333,
+   "anchor_lon": -124.55535286666667,
+   "theta_rad": 0.36226539624487214,
+   "n_forced": 10,
+   "n_near": 25
+  },
+  {
+   "anchor_lat": 48.40082360655738,
+   "anchor_lon": -122.5856331147541,
+   "theta_rad": 6.251024210233525,
+   "n_forced": 15,
+   "n_near": 16
+  },
+  {
+   "anchor_lat": 46.167148100558656,
+   "anchor_lon": -123.91839,
+   "theta_rad": 2.333277223222731,
+   "n_forced": 39,
+   "n_near": 32
+  },
+  {
+   "anchor_lat": 45.84836984615385,
+   "anchor_lon": -124.36525353846154,
+   "theta_rad": 4.973967201436151,
+   "n_forced": 56,
+   "n_near": 94
+  },
+  {
+   "anchor_lat": 46.61882857142857,
+   "anchor_lon": -124.28055523809525,
+   "theta_rad": 4.924820644333938,
+   "n_forced": 45,
+   "n_near": 73
+  },
+  {
+   "anchor_lat": 47.663873478260875,
+   "anchor_lon": -122.39148579710145,
+   "theta_rad": 4.883602053441477,
+   "n_forced": 8,
+   "n_near": 21
+  },
+  {
+   "anchor_lat": 46.00150424581006,
+   "anchor_lon": -124.30675089385475,
+   "theta_rad": 0.1600364106573571,
+   "n_forced": 43,
+   "n_near": 72
+  },
+  {
+   "anchor_lat": 45.8791264516129,
+   "anchor_lon": -124.2385612903226,
+   "theta_rad": 1.6720933665401505,
+   "n_forced": 45,
+   "n_near": 18
+  }
+ ],
+ "model_seeds": [
+  0,
+  1,
+  2,
+  3,
+  4
+ ],
+ "trainable_params": {
+  "LSTM-rec": 10702,
+  "LSTM-ms": 12640
+ },
+ "filters": {
+  "vessel_type": 30,
+  "p95_sog_kn_max": 10.0,
+  "gap_split_s": 1800,
+  "gap_interp_s": 600,
+  "min_ticks": 60,
+  "max_ticks": 720,
+  "d_near_max_km": 30.0
+ }
+}
